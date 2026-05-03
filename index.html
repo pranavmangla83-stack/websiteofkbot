@@ -173,6 +173,13 @@
             <p class="text-sm font-semibold uppercase tracking-[0.18em] text-brandDeep">Simple starting price</p>
             <p class="mt-2 text-4xl font-bold">Rs. 250<span class="text-base font-medium text-ink/55">/month</span></p>
             <p class="mt-2 text-sm leading-6 text-ink/65">AI website chatbot for small businesses, with document-based answers and lead capture.</p>
+            <a
+              id="pay-250-btn"
+              href="#demo"
+              class="spring mt-4 inline-flex w-full justify-center rounded-full bg-ink px-5 py-3 text-sm font-semibold text-white shadow-soft hover:-translate-y-0.5 hover:bg-brandDeep focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink active:translate-y-0 sm:w-auto"
+            >
+              Pay Rs. 250/month
+            </a>
           </div>
           <div class="mt-8 flex flex-col gap-4 sm:flex-row">
             <a
@@ -184,10 +191,10 @@
             </a>
             <a
               id="pricing-btn"
-              href="#pricing"
+              href="#demo"
               class="spring rounded-full border border-ink/10 bg-white/80 px-6 py-3 text-center text-sm font-semibold text-ink shadow-soft hover:-translate-y-0.5 hover:border-leaf/40 hover:text-leaf focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-leaf active:translate-y-0"
             >
-              See Rs. 250 Plan
+              Pay Rs. 250/month
             </a>
           </div>
           <div class="mt-10 grid grid-cols-1 gap-4 sm:grid-cols-3">
@@ -319,6 +326,13 @@
             <p class="text-sm font-semibold uppercase tracking-[0.18em] text-brandDeep">Starter</p>
             <h3 class="mt-4 text-4xl font-bold">Rs. 250<span class="text-base font-medium text-ink/55">/month</span></h3>
             <p class="mt-4 text-base leading-7 text-ink/70">Best for small websites that need basic document-based answers and lead capture.</p>
+            <a
+              href="#demo"
+              class="spring mt-6 inline-flex w-full justify-center rounded-full bg-brand px-5 py-3 text-sm font-semibold text-white shadow-glow hover:-translate-y-0.5 hover:bg-brandDeep focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand active:translate-y-0"
+              data-track-pay="starter"
+            >
+              Pay Rs. 250/month
+            </a>
           </article>
           <article class="rounded-[28px] border border-white/70 card-surface p-6 shadow-soft">
             <p class="text-sm font-semibold uppercase tracking-[0.18em] text-brandDeep">Custom</p>
@@ -351,6 +365,7 @@
       var trackedButtons = [
         { id: "get-demo-btn", eventName: "get_demo_click" },
         { id: "pricing-btn", eventName: "pricing_click" },
+        { id: "pay-250-btn", eventName: "pay_250_click" },
         { id: "book-demo-btn", eventName: "book_demo_click" }
       ];
 
@@ -369,6 +384,24 @@
           if (typeof window.gtag === "function") {
             window.gtag("event", button.eventName, {
               button_id: button.id,
+              page_location: window.location.href
+            });
+          }
+        });
+      });
+
+      document.querySelectorAll("[data-track-pay]").forEach(function (element) {
+        element.addEventListener("click", function () {
+          window.dataLayer = window.dataLayer || [];
+          window.dataLayer.push({
+            event: "pay_250_click",
+            plan: element.getAttribute("data-track-pay"),
+            page_location: window.location.href
+          });
+
+          if (typeof window.gtag === "function") {
+            window.gtag("event", "pay_250_click", {
+              plan: element.getAttribute("data-track-pay"),
               page_location: window.location.href
             });
           }
