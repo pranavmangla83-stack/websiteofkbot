@@ -6,6 +6,7 @@ const siteUrl = isLocalhost ? kindeConfig.localSiteUrl : kindeConfig.productionS
 const backendUrl = (isLocalhost ? kindeConfig.localBackendUrl : kindeConfig.productionBackendUrl).replace(/\/$/, "");
 const dashboardPath = "/dashboard.html";
 const redirectStorageKey = "kbot_post_auth_redirect";
+const authIntentStorageKey = "kbot_auth_intent";
 
 let kindeClient;
 let currentAccount;
@@ -38,6 +39,7 @@ async function initAuth() {
 
   bindAuthButtons();
   await renderAuthState();
+  if (await redirectAuthenticatedIntent()) return;
   await protectCurrentPage();
   await syncAuthenticatedUser();
   await renderDashboardState();
@@ -106,6 +108,7 @@ async function startAuthFlow(type, element) {
   }
 
   storeRedirect(redirectTo);
+  storeAuthIntent(redirectTo);
   const options = { app_state: { redirectTo } };
   if (type === "login") {
     await kindeClient.login(options);
@@ -113,6 +116,17 @@ async function startAuthFlow(type, element) {
   }
 
   await kindeClient.register(options);
+}
+
+async function redirectAuthenticatedIntent() {
+  const redirectTo = readAuthIntentRedirect();
+  if (!redirectTo || window.location.pathname === redirectTo) return false;
+  const isAuthenticated = await kindeClient.isAuthenticated();
+  if (!isAuthenticated) return false;
+
+  clearAuthIntent();
+  window.location.replace(redirectTo);
+  return true;
 }
 
 function storeRedirect(redirectTo) {
@@ -123,10 +137,22 @@ function storeRedirect(redirectTo) {
   }
 }
 
+function storeAuthIntent(redirectTo) {
+  try {
+    window.localStorage.setItem(authIntentStorageKey, JSON.stringify({
+      redirectTo,
+      createdAt: Date.now()
+    }));
+  } catch (_error) {
+    // Local storage is only a redirect hint; login still works without it.
+  }
+}
+
 function getStoredRedirect(primaryRedirect) {
-  const redirectTo = normalizeRedirectPath(primaryRedirect) || readStoredRedirect();
+  const redirectTo = normalizeRedirectPath(primaryRedirect) || readStoredRedirect() || readAuthIntentRedirect();
   try {
     window.sessionStorage.removeItem(redirectStorageKey);
+    clearAuthIntent();
   } catch (_error) {
     // Nothing to clean up when storage is blocked.
   }
@@ -138,6 +164,27 @@ function readStoredRedirect() {
     return normalizeRedirectPath(window.sessionStorage.getItem(redirectStorageKey));
   } catch (_error) {
     return "";
+  }
+}
+
+function readAuthIntentRedirect() {
+  try {
+    const intent = JSON.parse(window.localStorage.getItem(authIntentStorageKey) || "null");
+    if (!intent || Date.now() - Number(intent.createdAt || 0) > 10 * 60 * 1000) {
+      window.localStorage.removeItem(authIntentStorageKey);
+      return "";
+    }
+    return normalizeRedirectPath(intent.redirectTo);
+  } catch (_error) {
+    return "";
+  }
+}
+
+function clearAuthIntent() {
+  try {
+    window.localStorage.removeItem(authIntentStorageKey);
+  } catch (_error) {
+    // Nothing to clear when storage is blocked.
   }
 }
 
