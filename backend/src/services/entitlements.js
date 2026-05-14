@@ -19,7 +19,7 @@ export async function assertCanUploadPdf(db, account) {
     throw entitlementError(
       entitlement.active
         ? `PDF upload limit reached for your ${entitlement.planName} plan.`
-        : "Trial PDF upload limit reached. Please subscribe to upload more PDFs."
+        : "Basic is required before uploading more PDFs."
     );
   }
 
@@ -39,7 +39,7 @@ export async function assertCanUseChat(db, clientId) {
     throw entitlementError(
       entitlement.active
         ? `Monthly message limit reached for your ${entitlement.planName} plan.`
-        : "Trial message limit reached. Please subscribe to continue using chat."
+        : "Basic is required to continue using chat."
     );
   }
 
@@ -47,7 +47,7 @@ export async function assertCanUseChat(db, clientId) {
     throw entitlementError(
       entitlement.active
         ? `Monthly token limit reached for your ${entitlement.planName} plan.`
-        : "Trial token limit reached. Please subscribe to continue using chat."
+        : "Basic is required to continue using chat."
     );
   }
 
@@ -71,7 +71,7 @@ async function getClientEntitlement(db, account) {
 
   return {
     active: false,
-    planName: "Trial",
+    planName: "Basic inactive",
     pdfLimit: Number(account.client.pdf_limit || 3),
     messageLimit: TRIAL_MESSAGE_LIMIT,
     tokenLimit: TRIAL_TOKEN_LIMIT

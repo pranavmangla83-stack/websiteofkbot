@@ -279,17 +279,24 @@ async function renderDashboardState() {
     setText(accessElement, billingAccessLabel(paymentState, billing.dashboard_access_allowed));
     setButtonEnabled(subscribeButton, !billing.active && !billing.checkout_pending);
     if (subscribeButton) subscribeButton.textContent = billingButtonLabel(paymentState, billing.checkout_pending);
+    setDashboardSetupVisible(Boolean(billing.active));
 
     document.querySelectorAll("[data-company-name]").forEach(function (element) {
       element.textContent = account.tenant?.company_name || "Your company";
     });
 
-    renderWebsiteUrl(account);
-    renderEmbedScript(account);
-    await renderDocuments();
+    if (billing.active) {
+      renderWebsiteUrl(account);
+      renderEmbedScript(account);
+      await renderDocuments();
+    }
   } catch (error) {
     console.error("Dashboard load failed:", error);
-    setText(errorElement, "Backend is not ready yet. Check backend server, database, and auth settings.");
+    setText(statusElement, "Backend offline");
+    setText(planElement, "Basic - ₹1/month");
+    setText(accessElement, "Checkout is unavailable until the backend API is online.");
+    setText(errorElement, "Backend API is not reachable at the configured URL. Deploy the backend or update productionBackendUrl.");
+    setDashboardSetupVisible(false);
     setButtonEnabled(subscribeButton, false);
   }
 }
@@ -658,20 +665,20 @@ function documentStatusLabel(status) {
 
 function billingStatusLabel(state) {
   const labels = {
-    trial: "Trial",
-    active: "Active",
+    trial: "Basic not active",
+    active: "Basic active",
     payment_failed: "Payment failed",
     cancelled: "Cancelled"
   };
 
-  return labels[state] || "Trial";
+  return labels[state] || "Basic not active";
 }
 
 function billingAccessLabel(state, accessAllowed) {
   if (accessAllowed) return "Basic plan limits are active";
-  if (state === "payment_failed") return "Payment failed. Trial limits apply until payment is restored.";
-  if (state === "cancelled") return "Subscription cancelled. Trial limits apply.";
-  return "Trial limits apply until Basic is active";
+  if (state === "payment_failed") return "Payment failed. Basic features are locked until payment is restored.";
+  if (state === "cancelled") return "Subscription cancelled. Basic features are locked.";
+  return "Start Basic to unlock uploads and chatbot setup.";
 }
 
 function billingButtonLabel(state, checkoutPending) {
@@ -815,4 +822,10 @@ function setButtonEnabled(button, enabled) {
   button.disabled = !enabled;
   button.classList.toggle("opacity-60", !enabled);
   button.classList.toggle("cursor-not-allowed", !enabled);
+}
+
+function setDashboardSetupVisible(visible) {
+  document.querySelectorAll("[data-billing-setup]").forEach(function (element) {
+    element.classList.toggle("hidden", !visible);
+  });
 }
