@@ -40,6 +40,7 @@ async function initAuth() {
   bindAuthButtons();
   await renderAuthState();
   if (await redirectAuthenticatedIntent()) return;
+  if (await redirectAuthenticatedHome()) return;
   await protectCurrentPage();
   await syncAuthenticatedUser();
   await renderDashboardState();
@@ -129,6 +130,15 @@ async function redirectAuthenticatedIntent() {
   return true;
 }
 
+async function redirectAuthenticatedHome() {
+  if (!isHomePage()) return false;
+  const isAuthenticated = await kindeClient.isAuthenticated();
+  if (!isAuthenticated) return false;
+
+  window.location.replace(dashboardPath);
+  return true;
+}
+
 function storeRedirect(redirectTo) {
   try {
     window.sessionStorage.setItem(redirectStorageKey, redirectTo);
@@ -193,6 +203,10 @@ function normalizeRedirectPath(value) {
   const redirectTo = String(value).trim();
   if (!redirectTo.startsWith("/") || redirectTo.startsWith("//")) return "";
   return redirectTo;
+}
+
+function isHomePage() {
+  return window.location.pathname === "/" || window.location.pathname === "/index.html";
 }
 
 async function renderAuthState() {
