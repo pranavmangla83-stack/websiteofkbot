@@ -217,10 +217,21 @@ async function protectCurrentPage() {
 
   const isAuthenticated = await kindeClient.isAuthenticated();
   if (!isAuthenticated) {
-    await kindeClient.login({
-      app_state: { redirectTo: window.location.pathname }
-    });
+    showProtectedLoginRequired();
+    throw new Error("Authentication is required for this page.");
   }
+}
+
+function showProtectedLoginRequired() {
+  const errorElement = document.querySelector("[data-dashboard-error]");
+  const accessElement = document.querySelector("[data-dashboard-access]");
+  const statusElement = document.querySelector("[data-billing-status]");
+  const subscribeButton = document.querySelector("[data-subscribe-basic]");
+
+  setText(statusElement, "Login required");
+  setText(accessElement, "Please log in to continue.");
+  setText(errorElement, "Login did not complete in this browser session. Return home, refresh once, and log in again.");
+  setButtonEnabled(subscribeButton, false);
 }
 
 async function syncAuthenticatedUser() {
