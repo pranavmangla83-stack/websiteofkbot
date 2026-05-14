@@ -7,6 +7,9 @@ import { getRazorpay, verifySubscriptionCheckoutSignature, verifyWebhookSignatur
 
 export const billingRouter = express.Router();
 
+const RAZORPAY_PAISE_PER_RUPEE = 100;
+const RAZORPAY_EXPECTED_CURRENCY = "INR";
+
 billingRouter.post("/create-subscription", requireAuth, async (req, res, next) => {
   try {
     requireEnv(["razorpayKeyId", "razorpayKeySecret", "razorpayWebhookSecret", "razorpayBasicPlanId"]);
@@ -25,13 +28,15 @@ billingRouter.post("/create-subscription", requireAuth, async (req, res, next) =
       return res.status(500).json({ error: "Basic plan is not seeded in the database" });
     }
 
+    await assertRazorpayPlanMatchesLocalPlan(plan);
+
     if (isAwaitingWebhookActivation(account.subscription)) {
       return res.status(409).json({
         error: "Payment is verified. Your Basic plan is being activated. Please refresh in a minute."
       });
     }
 
-    if (isReusableCheckoutSubscription(account.subscription)) {
+    if (await isReusableCheckoutSubscription(account.subscription)) {
       return res.json(subscriptionCheckoutResponse({
         account,
         plan,
@@ -311,9 +316,13 @@ function paymentStateForSubscription(subscription) {
   return "trial";
 }
 
-function isReusableCheckoutSubscription(subscription) {
+async function isReusableCheckoutSubscription(subscription) {
   if (!subscription?.razorpay_subscription_id) return false;
-  return String(subscription.status || "").toLowerCase() === "created";
+  if (String(subscription.status || "").toLowerCase() !== "created") return false;
+
+  const razorpaySubscription = await getRazorpay().subscriptions.fetch(subscription.razorpay_subscription_id);
+  return razorpaySubscription.plan_id === env.razorpayBasicPlanId
+    && String(razorpaySubscription.status || "").toLowerCase() === "created";
 }
 
 function isAwaitingWebhookActivation(subscription) {
@@ -342,6 +351,28 @@ function subscriptionCheckoutResponse({ account, plan, subscriptionId, subscript
       }
     }
   };
+}
+
+async function assertRazorpayPlanMatchesLocalPlan(plan) {
+  const razorpayPlan = await getRazorpay().plans.fetch(env.razorpayBasicPlanId);
+  const expectedAmount = Number(plan.price_inr) * RAZORPAY_PAISE_PER_RUPEE;
+  const actualAmount = Number(razorpayPlan.item?.amount);
+  const actualCurrency = String(razorpayPlan.item?.currency || "").toUpperCase();
+  const expectedPeriod = String(plan.billing_interval || "").toLowerCase() === "yearly" ? "yearly" : "monthly";
+  const actualPeriod = String(razorpayPlan.period || "").toLowerCase();
+  const actualInterval = Number(razorpayPlan.interval || 0);
+
+  if (
+    actualAmount !== expectedAmount
+    || actualCurrency !== RAZORPAY_EXPECTED_CURRENCY
+    || actualPeriod !== expectedPeriod
+    || actualInterval !== 1
+  ) {
+    throw new Error(
+      `Razorpay Basic plan mismatch. Expected ${RAZORPAY_EXPECTED_CURRENCY} ${plan.price_inr}/${expectedPeriod}; ` +
+      `configured plan is ${actualCurrency || "UNKNOWN"} ${Number.isFinite(actualAmount) ? actualAmount / RAZORPAY_PAISE_PER_RUPEE : "UNKNOWN"}/${actualPeriod || "UNKNOWN"}.`
+    );
+  }
 }
 
 function removesPaidEntitlement(status) {
