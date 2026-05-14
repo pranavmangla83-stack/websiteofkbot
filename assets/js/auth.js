@@ -25,7 +25,7 @@ async function initAuth() {
     domain: kindeConfig.domain,
     redirect_uri: siteUrl,
     logout_uri: siteUrl,
-    is_dangerously_use_local_storage: isLocalhost,
+    is_dangerously_use_local_storage: true,
     on_redirect_callback: function (_user, appState) {
       const redirectTo = getStoredRedirect(appState?.redirectTo);
       if (redirectTo && window.location.pathname !== redirectTo) {
