@@ -5,9 +5,11 @@ const isLocalhost = ["localhost", "127.0.0.1"].includes(window.location.hostname
 const siteUrl = isLocalhost ? kindeConfig.localSiteUrl : kindeConfig.productionSiteUrl;
 const backendUrl = (isLocalhost ? kindeConfig.localBackendUrl : kindeConfig.productionBackendUrl).replace(/\/$/, "");
 const dashboardPath = "/dashboard.html";
+const redirectStorageKey = "kbot_post_auth_redirect";
 
 let kindeClient;
 let currentAccount;
+let redirectingAfterAuth = false;
 
 initAuth();
 
@@ -24,11 +26,15 @@ async function initAuth() {
     logout_uri: siteUrl,
     is_dangerously_use_local_storage: isLocalhost,
     on_redirect_callback: function (_user, appState) {
-      if (appState?.redirectTo) {
-        window.location.assign(appState.redirectTo);
+      const redirectTo = getStoredRedirect(appState?.redirectTo);
+      if (redirectTo && window.location.pathname !== redirectTo) {
+        redirectingAfterAuth = true;
+        window.location.replace(redirectTo);
       }
     }
   });
+
+  if (redirectingAfterAuth) return;
 
   bindAuthButtons();
   await renderAuthState();
@@ -52,9 +58,7 @@ function bindAuthButtons() {
   if (loginButton) {
     loginButton.addEventListener("click", async function (event) {
       event.preventDefault();
-      await kindeClient.login({
-        app_state: { redirectTo: loginButton.getAttribute("data-redirect-to") || dashboardPath }
-      });
+      await startAuthFlow("login", loginButton);
     });
   }
 
@@ -62,31 +66,25 @@ function bindAuthButtons() {
   if (registerButton) {
     registerButton.addEventListener("click", async function (event) {
       event.preventDefault();
-      await kindeClient.register({
-        app_state: { redirectTo: registerButton.getAttribute("data-redirect-to") || dashboardPath }
-      });
+      await startAuthFlow("register", registerButton);
     });
   }
 
   document.querySelectorAll("[data-kinde-login]").forEach(function (element) {
     if (element.id === "login") return;
 
-    element.addEventListener("click", function (event) {
+    element.addEventListener("click", async function (event) {
       event.preventDefault();
-      kindeClient.login({
-        app_state: { redirectTo: element.getAttribute("data-redirect-to") || dashboardPath }
-      });
+      await startAuthFlow("login", element);
     });
   });
 
   document.querySelectorAll("[data-kinde-register]").forEach(function (element) {
     if (element.id === "register") return;
 
-    element.addEventListener("click", function (event) {
+    element.addEventListener("click", async function (event) {
       event.preventDefault();
-      kindeClient.register({
-        app_state: { redirectTo: element.getAttribute("data-redirect-to") || dashboardPath }
-      });
+      await startAuthFlow("register", element);
     });
   });
 
@@ -96,6 +94,58 @@ function bindAuthButtons() {
       kindeClient.logout();
     });
   });
+}
+
+async function startAuthFlow(type, element) {
+  const redirectTo = normalizeRedirectPath(element.getAttribute("data-redirect-to")) || dashboardPath;
+  const isAuthenticated = await kindeClient.isAuthenticated();
+
+  if (isAuthenticated) {
+    window.location.assign(redirectTo);
+    return;
+  }
+
+  storeRedirect(redirectTo);
+  const options = { app_state: { redirectTo } };
+  if (type === "login") {
+    await kindeClient.login(options);
+    return;
+  }
+
+  await kindeClient.register(options);
+}
+
+function storeRedirect(redirectTo) {
+  try {
+    window.sessionStorage.setItem(redirectStorageKey, redirectTo);
+  } catch (_error) {
+    // Session storage can be unavailable in strict browser modes.
+  }
+}
+
+function getStoredRedirect(primaryRedirect) {
+  const redirectTo = normalizeRedirectPath(primaryRedirect) || readStoredRedirect();
+  try {
+    window.sessionStorage.removeItem(redirectStorageKey);
+  } catch (_error) {
+    // Nothing to clean up when storage is blocked.
+  }
+  return redirectTo;
+}
+
+function readStoredRedirect() {
+  try {
+    return normalizeRedirectPath(window.sessionStorage.getItem(redirectStorageKey));
+  } catch (_error) {
+    return "";
+  }
+}
+
+function normalizeRedirectPath(value) {
+  if (!value) return "";
+  const redirectTo = String(value).trim();
+  if (!redirectTo.startsWith("/") || redirectTo.startsWith("//")) return "";
+  return redirectTo;
 }
 
 async function renderAuthState() {
