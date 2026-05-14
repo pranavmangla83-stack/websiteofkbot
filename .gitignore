@@ -1,3 +1,12 @@
 serve.log
 serve3001.log
 serve3001.err
+.env
+.env.local
+.env.production
+.npm-cache/
+node_modules/
+backend/tmp/
+*.md
+*.pdf
+!README.md

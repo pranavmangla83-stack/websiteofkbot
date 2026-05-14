@@ -20,15 +20,26 @@ const mimeTypes = {
   ".ico": "image/x-icon"
 };
 
-function sendFile(res, filePath) {
-  const ext = path.extname(filePath).toLowerCase();
-  const type = mimeTypes[ext] || "application/octet-stream";
-  res.writeHead(200, { "Content-Type": type });
-  fs.createReadStream(filePath).pipe(res);
-}
-
 const server = http.createServer((req, res) => {
-  const reqPath = req.url === "/" ? "/index.html" : req.url || "/index.html";
+  serveStaticFile(res, decodeURIComponent(req.url || "/"));
+});
+
+server.listen(port, host, () => {
+  console.log(`Static server running at http://${host}:${port}`);
+});
+
+function serveStaticFile(res, pathname) {
+  const cleanPath = pathname.split("?")[0].split("#")[0];
+  const routeMap = new Map([
+    ["/", "/index.html"],
+    ["/dashboard", "/dashboard.html"],
+    ["/client", "/dashboard.html"],
+    ["/admin", "/admin.html"],
+    ["/privacy", "/privacy.html"],
+    ["/terms", "/terms.html"],
+    ["/refund", "/refund.html"]
+  ]);
+  const reqPath = routeMap.get(cleanPath) || cleanPath;
   const safePath = path.normalize(reqPath).replace(/^(\.\.[/\\])+/, "");
   const filePath = path.join(__dirname, safePath);
 
@@ -41,8 +52,11 @@ const server = http.createServer((req, res) => {
 
     sendFile(res, filePath);
   });
-});
+}
 
-server.listen(port, host, () => {
-  console.log(`Server running at http://${host}:${port}`);
-});
+function sendFile(res, filePath) {
+  const ext = path.extname(filePath).toLowerCase();
+  const type = mimeTypes[ext] || "application/octet-stream";
+  res.writeHead(200, { "Content-Type": type });
+  fs.createReadStream(filePath).pipe(res);
+}

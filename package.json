@@ -1,0 +1,36 @@
+{
+  "name": "websiteofkbot",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node serve.mjs",
+    "backend": "node backend/src/server.js",
+    "backend:dev": "node backend/src/server.js",
+    "db:migrate": "node backend/db/migrate.js",
+    "test:pdf-ingestion": "node backend/scripts/test-pdf-ingestion.mjs",
+    "dev": "node serve.mjs",
+    "serve": "node serve.mjs"
+  },
+  "dependencies": {
+    "@kinde-oss/kinde-auth-pkce-js": "^4.3.0",
+    "@napi-rs/canvas": "^1.0.0",
+    "@supabase/supabase-js": "^2.105.4",
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "express-rate-limit": "^8.2.1",
+    "helmet": "^8.1.0",
+    "jose": "^6.2.3",
+    "multer": "^2.0.2",
+    "openai": "^6.9.1",
+    "pdf-parse": "^1.1.1",
+    "pdfjs-dist": "^5.7.284",
+    "pg": "^8.20.0",
+    "razorpay": "^2.9.6",
+    "tesseract.js": "^7.0.0"
+  },
+  "devDependencies": {
+    "pdfkit": "^0.18.0"
+  }
+}

@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard | Custom AI Chatbot</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Space+Grotesk:wght@500;700&display=swap"
+    rel="stylesheet"
+  >
+  <style>
+    body {
+      font-family: "DM Sans", sans-serif;
+      background: linear-gradient(180deg, #fffaf5 0%, #f7f0e8 100%);
+      color: #0f1720;
+    }
+
+    h1, h2 {
+      font-family: "Space Grotesk", sans-serif;
+    }
+  </style>
+</head>
+<body class="min-h-screen" data-protected-page data-dashboard-page>
+  <header class="mx-auto flex max-w-6xl items-center justify-between px-6 py-6 md:px-10">
+    <a href="/" class="font-bold">AI Website Chatbot</a>
+    <nav class="flex items-center gap-3 text-sm">
+      <span data-user-email class="hidden text-slate-600 sm:inline" data-auth-user></span>
+      <a href="/" class="rounded-full border border-slate-200 bg-white px-5 py-2.5 font-semibold text-slate-900">Home</a>
+      <a href="/" data-kinde-logout class="rounded-full bg-slate-950 px-5 py-2.5 font-semibold text-white">Logout</a>
+    </nav>
+  </header>
+
+  <main class="mx-auto max-w-6xl px-6 py-10 md:px-10">
+    <section class="rounded-3xl border border-white/70 bg-white/80 p-6 shadow-lg md:p-8">
+      <p class="text-sm font-semibold uppercase tracking-widest text-[#8e4427]">Client dashboard</p>
+      <h1 class="mt-3 text-3xl font-bold md:text-5xl">Set up your website chatbot</h1>
+      <p class="mt-4 max-w-2xl text-base leading-7 text-slate-700">
+        Upload your business documents, upgrade when ready, and copy one chatbot script to your website.
+      </p>
+      <div class="mt-6 grid gap-3 rounded-2xl border border-slate-200 bg-white p-5 text-sm md:grid-cols-3">
+        <div>
+          <p class="font-semibold text-slate-500">Company</p>
+          <p class="mt-1 font-bold" data-company-name>Loading...</p>
+        </div>
+        <div>
+          <p class="font-semibold text-slate-500">Plan</p>
+          <p class="mt-1 font-bold" data-plan-name>Checking...</p>
+        </div>
+        <div>
+          <p class="font-semibold text-slate-500">Status</p>
+          <p class="mt-1 font-bold" data-billing-status>Checking...</p>
+        </div>
+      </div>
+      <div class="mt-4 rounded-2xl bg-slate-950 p-5 text-white">
+        <p class="text-sm text-white/65">Access</p>
+        <p class="mt-1 font-bold" data-dashboard-access>Checking dashboard access...</p>
+        <button
+          type="button"
+          data-subscribe-basic
+          class="mt-4 rounded-full bg-[#c96f4a] px-5 py-3 text-sm font-bold text-white"
+        >
+          Upgrade to Basic
+        </button>
+        <p class="mt-3 text-sm text-red-200" data-dashboard-error></p>
+      </div>
+      <div class="mt-8 grid gap-4 md:grid-cols-3">
+        <article class="rounded-2xl bg-[#fff7ef] p-5">
+          <h2 class="font-bold">1. Upgrade to Basic</h2>
+          <p class="mt-2 text-sm leading-6 text-slate-600">Start the ₹350/month recurring subscription when trial limits are not enough.</p>
+        </article>
+        <article class="rounded-2xl bg-[#f4f8f2] p-5">
+          <h2 class="font-bold">2. Upload knowledge</h2>
+          <p class="mt-2 text-sm leading-6 text-slate-600">Collect PDFs, FAQs, and website information after login.</p>
+        </article>
+        <article class="rounded-2xl bg-[#eef4f8] p-5">
+          <h2 class="font-bold">3. Install chatbot</h2>
+          <p class="mt-2 text-sm leading-6 text-slate-600">Show the website script once the chatbot is configured.</p>
+        </article>
+      </div>
+
+      <div class="mt-8 grid gap-6 lg:grid-cols-[1fr_0.9fr]">
+        <section class="rounded-2xl border border-slate-200 bg-white p-5">
+          <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 class="text-xl font-bold">PDF knowledge</h2>
+              <p class="mt-1 text-sm text-slate-600">Upload up to 3 business PDFs, 7 MB each, for your chatbot to answer from.</p>
+            </div>
+            <form data-pdf-upload-form class="flex flex-col gap-2 sm:items-end">
+              <input
+                type="file"
+                name="pdf"
+                accept="application/pdf,.pdf"
+                class="max-w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
+                data-pdf-input
+              >
+              <button type="submit" class="rounded-full bg-[#c96f4a] px-5 py-2.5 text-sm font-bold text-white">
+                Upload PDF
+              </button>
+            </form>
+          </div>
+          <p class="mt-3 text-sm text-slate-600" data-documents-status></p>
+          <div class="mt-5 overflow-hidden rounded-xl border border-slate-200">
+            <div class="grid grid-cols-[1fr_110px_80px] gap-3 bg-slate-50 px-4 py-3 text-xs font-bold uppercase tracking-wide text-slate-500">
+              <span>File</span>
+              <span>Status</span>
+              <span></span>
+            </div>
+            <div data-documents-list class="divide-y divide-slate-100 text-sm">
+              <div class="px-4 py-4 text-slate-500">Loading documents...</div>
+            </div>
+          </div>
+        </section>
+
+        <section class="rounded-2xl border border-slate-200 bg-white p-5">
+          <h2 class="text-xl font-bold">Website script</h2>
+          <p class="mt-1 text-sm text-slate-600">Copy one script and paste it before the closing body tag on your website.</p>
+          <form data-website-url-form class="mt-4 space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
+            <label class="block text-sm font-bold text-slate-900" for="website-url">Allowed website URL</label>
+            <div class="flex flex-col gap-2 sm:flex-row">
+              <input
+                id="website-url"
+                type="url"
+                placeholder="https://example.com"
+                class="min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
+                data-website-url-input
+              >
+              <button type="submit" class="rounded-full bg-slate-950 px-5 py-2.5 text-sm font-bold text-white">
+                Save URL
+              </button>
+            </div>
+            <p class="text-sm text-slate-600" data-website-url-status></p>
+          </form>
+          <textarea
+            readonly
+            data-embed-script
+            class="mt-4 h-32 w-full resize-none rounded-xl border border-slate-200 bg-slate-50 p-3 font-mono text-xs text-slate-700"
+          ></textarea>
+          <div class="mt-3 flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              data-copy-script
+              class="rounded-full border border-slate-200 bg-white px-5 py-2.5 text-sm font-bold text-slate-900"
+            >
+              Copy script
+            </button>
+            <p class="text-sm font-semibold text-slate-600">Paste before &lt;/body&gt;</p>
+          </div>
+          <div class="mt-5 overflow-hidden rounded-2xl border border-slate-200 bg-slate-50">
+            <div class="border-b border-slate-200 px-4 py-3">
+              <p class="text-sm font-bold text-slate-900">Preview widget</p>
+            </div>
+            <iframe
+              title="Chatbot widget preview"
+              data-widget-preview
+              class="h-80 w-full bg-white"
+              sandbox="allow-scripts allow-same-origin allow-forms"
+            ></iframe>
+          </div>
+        </section>
+      </div>
+    </section>
+  </main>
+
+  <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+  <script type="module" src="/assets/js/auth.js"></script>
+</body>
+</html>
