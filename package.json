@@ -3,8 +3,9 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
+  "main": "server.js",
   "scripts": {
-    "start": "node serve.mjs",
+    "start": "node server.js",
     "backend": "node backend/src/server.js",
     "backend:dev": "node backend/src/server.js",
     "db:migrate": "node backend/db/migrate.js",

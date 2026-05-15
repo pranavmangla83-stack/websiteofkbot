@@ -1,6 +1,8 @@
 import cors from "cors";
 import express from "express";
 import helmet from "helmet";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { env } from "./config/env.js";
 import { errorHandler, notFound } from "./middleware/errors.js";
 import { requireAuth } from "./middleware/auth.js";
@@ -15,6 +17,9 @@ import { testDbRouter } from "./routes/test-db.routes.js";
 import { widgetRouter } from "./routes/widget.routes.js";
 
 export const app = express();
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const projectRoot = path.resolve(__dirname, "../..");
 
 const adminCors = cors({
   origin: (origin, callback) => {
@@ -69,6 +74,28 @@ app.use("/api", adminCors, scriptRouter);
 app.use("/api/db", adminCors, requireAuth, testDbRouter);
 app.use("/api/test-db", adminCors, requireAuth, testDbRouter);
 app.use(publicCors, widgetRouter);
+
+app.use("/assets", express.static(path.join(projectRoot, "assets")));
+
+const frontendRoutes = new Map([
+  ["/", "index.html"],
+  ["/index.html", "index.html"],
+  ["/dashboard", "dashboard.html"],
+  ["/dashboard.html", "dashboard.html"],
+  ["/client", "dashboard.html"],
+  ["/admin", "admin.html"],
+  ["/admin.html", "admin.html"],
+  ["/privacy", "privacy.html"],
+  ["/privacy.html", "privacy.html"],
+  ["/terms", "terms.html"],
+  ["/terms.html", "terms.html"],
+  ["/refund", "refund.html"],
+  ["/refund.html", "refund.html"]
+]);
+
+app.get(Array.from(frontendRoutes.keys()), (req, res) => {
+  res.sendFile(path.join(projectRoot, frontendRoutes.get(req.path)));
+});
 
 app.use(notFound);
 app.use(errorHandler);
