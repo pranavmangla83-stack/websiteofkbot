@@ -4,6 +4,7 @@ dotenv.config();
 
 export const env = {
   port: Number(process.env.PORT || 4000),
+  host: process.env.HOST || "0.0.0.0",
   databaseUrl: process.env.DATABASE_URL,
   supabaseUrl: process.env.SUPABASE_URL,
   supabaseAnonKey: process.env.SUPABASE_ANON_KEY,
@@ -29,6 +30,7 @@ export const env = {
 
 const envKeyNames = {
   port: "PORT",
+  host: "HOST",
   databaseUrl: "DATABASE_URL",
   supabaseUrl: "SUPABASE_URL",
   supabaseAnonKey: "SUPABASE_ANON_KEY",
