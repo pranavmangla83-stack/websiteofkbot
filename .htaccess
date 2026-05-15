@@ -1,0 +1,3 @@
+<IfModule LiteSpeed>
+  LsRecaptcha 0
+</IfModule>
