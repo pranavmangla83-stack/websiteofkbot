@@ -51,7 +51,7 @@ CREATE TABLE IF NOT EXISTS public.plans (
   billing_interval text NOT NULL CHECK (billing_interval IN ('monthly', 'yearly')),
   chatbot_limit integer NOT NULL DEFAULT 1 CHECK (chatbot_limit >= 0),
   pdf_limit integer NOT NULL DEFAULT 3 CHECK (pdf_limit >= 0),
-  message_limit integer NOT NULL DEFAULT 1000 CHECK (message_limit >= 0),
+  message_limit integer NOT NULL DEFAULT 400 CHECK (message_limit >= 0),
   token_limit integer NOT NULL DEFAULT 1000000 CHECK (token_limit >= 0),
   is_active boolean NOT NULL DEFAULT true,
   created_at timestamptz NOT NULL DEFAULT now()

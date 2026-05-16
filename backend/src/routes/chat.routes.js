@@ -13,7 +13,8 @@ export const chatRouter = express.Router();
 
 const chatLimiter = createChatLimiter({
   windowMs: 60 * 1000,
-  limit: 20
+  visitorLimit: 20,
+  clientLimit: 100
 });
 
 chatRouter.post("/", chatLimiter, async (req, res, next) => {
@@ -363,23 +364,24 @@ function getBasicAnswer(message) {
   return null;
 }
 
-function createChatLimiter({ windowMs, limit }) {
+function createChatLimiter({ windowMs, visitorLimit, clientLimit }) {
   const buckets = new Map();
 
   return function limitChat(req, res, next) {
     const clientId = isUuid(req.body?.client_id) ? req.body.client_id : "unknown";
     const sessionId = normalizeSessionId(req.body?.session_id || req.body?.visitor_id);
-    const keys = [
-      `client:${clientId}:ip:${req.ip || "unknown"}`
+    const limits = [
+      { key: `client:${clientId}:global`, limit: clientLimit },
+      { key: `client:${clientId}:ip:${req.ip || "unknown"}`, limit: visitorLimit }
     ];
 
     if (sessionId) {
-      keys.push(`client:${clientId}:session:${sessionId}`);
+      limits.push({ key: `client:${clientId}:session:${sessionId}`, limit: visitorLimit });
     }
 
     const now = Date.now();
 
-    for (const key of keys) {
+    for (const { key, limit } of limits) {
       const bucket = buckets.get(key);
       if (bucket && bucket.resetAt > now && bucket.count >= limit) {
         res.set("Retry-After", String(Math.ceil((bucket.resetAt - now) / 1000)));
@@ -387,7 +389,7 @@ function createChatLimiter({ windowMs, limit }) {
       }
     }
 
-    for (const key of keys) {
+    for (const { key } of limits) {
       const bucket = buckets.get(key);
       if (!bucket || bucket.resetAt <= now) {
         buckets.set(key, { count: 1, resetAt: now + windowMs });

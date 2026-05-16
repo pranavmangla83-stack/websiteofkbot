@@ -10,7 +10,7 @@ INSERT INTO public.plans (
   is_active
 )
 VALUES
-  ('basic', 'Basic', 350, 'monthly', 1, 3, 1000, 1000000, true),
+  ('basic', 'Basic', 350, 'monthly', 1, 3, 400, 1000000, true),
   ('pro', 'Pro', 0, 'monthly', 3, 100, 10000, 10000000, false)
 ON CONFLICT (name)
 DO UPDATE SET
