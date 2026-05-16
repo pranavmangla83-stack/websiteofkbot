@@ -275,7 +275,7 @@ async function renderDashboardState() {
 
     const paymentState = billing.payment_state || (billing.active ? "active" : "trial");
     setText(statusElement, billingStatusLabel(paymentState));
-    setText(planElement, billing.plan ? `${billing.plan.name} - ₹${billing.plan.price_inr}/${billing.plan.billing_interval}` : "Basic - ₹1/month");
+    setText(planElement, billing.plan ? `${billing.plan.name} - ₹${billing.plan.price_inr}/${billing.plan.billing_interval}` : "Basic - ₹350/month");
     setText(accessElement, billingAccessLabel(paymentState, billing.dashboard_access_allowed));
     setButtonEnabled(subscribeButton, !billing.active && !billing.checkout_pending);
     if (subscribeButton) subscribeButton.textContent = billingButtonLabel(paymentState, billing.checkout_pending);
@@ -293,7 +293,7 @@ async function renderDashboardState() {
   } catch (error) {
     console.error("Dashboard load failed:", error);
     setText(statusElement, "Backend offline");
-    setText(planElement, "Basic - ₹1/month");
+    setText(planElement, "Basic - ₹350/month");
     setText(accessElement, "Checkout is unavailable until the backend API is online.");
     setText(errorElement, "Backend API is not reachable at the configured URL. Deploy the backend or update productionBackendUrl.");
     setDashboardSetupVisible(false);
@@ -326,7 +326,7 @@ document.addEventListener("click", async function (event) {
     console.error("Subscription creation failed:", error);
     setText(statusElement, error.message || "Could not start checkout. Confirm Razorpay env values and the Basic plan id.");
     setButtonEnabled(subscribeButton, true);
-    subscribeButton.textContent = "Start Basic - ₹1/month";
+    subscribeButton.textContent = "Start Basic - ₹350/month";
   }
 });
 
@@ -684,9 +684,9 @@ function billingAccessLabel(state, accessAllowed) {
 function billingButtonLabel(state, checkoutPending) {
   if (state === "active") return "Basic active";
   if (checkoutPending) return "Activation pending";
-  if (state === "payment_failed") return "Retry ₹1/month payment";
-  if (state === "cancelled") return "Restart Basic - ₹1/month";
-  return "Start Basic - ₹1/month";
+  if (state === "payment_failed") return "Retry ₹350/month payment";
+  if (state === "cancelled") return "Restart Basic - ₹350/month";
+  return "Start Basic - ₹350/month";
 }
 
 function pollDocumentsWhileProcessing() {
@@ -799,13 +799,13 @@ function openRazorpayCheckout(checkout, subscribeButton) {
         const errorElement = document.querySelector("[data-dashboard-error]");
         setText(errorElement, "Payment signature could not be verified. Please contact support before retrying.");
         setButtonEnabled(subscribeButton, true);
-        if (subscribeButton) subscribeButton.textContent = "Start Basic - ₹1/month";
+        if (subscribeButton) subscribeButton.textContent = "Start Basic - ₹350/month";
       }
     },
     modal: {
       ondismiss: function () {
         setButtonEnabled(subscribeButton, true);
-        if (subscribeButton) subscribeButton.textContent = "Start Basic - ₹1/month";
+        if (subscribeButton) subscribeButton.textContent = "Start Basic - ₹350/month";
       }
     }
   });
