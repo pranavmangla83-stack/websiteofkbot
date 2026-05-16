@@ -2,26 +2,28 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
+const envValue = (key) => process.env[key]?.trim();
+
 export const env = {
-  port: Number(process.env.PORT || 4000),
-  host: process.env.HOST || "0.0.0.0",
-  databaseUrl: process.env.DATABASE_URL,
-  supabaseUrl: process.env.SUPABASE_URL,
-  supabaseAnonKey: process.env.SUPABASE_ANON_KEY,
-  supabasePublishableKey: process.env.SUPABASE_PUBLISHABLE_KEY || process.env.SUPABASE_ANON_KEY,
-  supabaseSecretKey: process.env.SUPABASE_SECRET_KEY,
-  supabaseServiceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY,
-  openaiApiKey: process.env.OPENAI_API_KEY,
-  frontendUrl: process.env.FRONTEND_URL || "http://localhost:3000",
-  backendUrl: process.env.BACKEND_URL || "http://localhost:4000",
-  kindeIssuerUrl: process.env.KINDE_ISSUER_URL,
-  kindeAudience: process.env.KINDE_AUDIENCE,
-  kindeClientId: process.env.KINDE_CLIENT_ID,
-  kindeClientSecret: process.env.KINDE_CLIENT_SECRET,
-  razorpayKeyId: process.env.RAZORPAY_KEY_ID,
-  razorpayKeySecret: process.env.RAZORPAY_KEY_SECRET,
-  razorpayWebhookSecret: process.env.RAZORPAY_WEBHOOK_SECRET,
-  razorpayBasicPlanId: process.env.RAZORPAY_BASIC_PLAN_ID,
+  port: Number(envValue("PORT") || 4000),
+  host: envValue("HOST") || "0.0.0.0",
+  databaseUrl: envValue("DATABASE_URL"),
+  supabaseUrl: envValue("SUPABASE_URL"),
+  supabaseAnonKey: envValue("SUPABASE_ANON_KEY"),
+  supabasePublishableKey: envValue("SUPABASE_PUBLISHABLE_KEY") || envValue("SUPABASE_ANON_KEY"),
+  supabaseSecretKey: envValue("SUPABASE_SECRET_KEY"),
+  supabaseServiceRoleKey: envValue("SUPABASE_SERVICE_ROLE_KEY"),
+  openaiApiKey: envValue("OPENAI_API_KEY"),
+  frontendUrl: envValue("FRONTEND_URL") || "http://localhost:3000",
+  backendUrl: envValue("BACKEND_URL") || "http://localhost:4000",
+  kindeIssuerUrl: envValue("KINDE_ISSUER_URL"),
+  kindeAudience: envValue("KINDE_AUDIENCE"),
+  kindeClientId: envValue("KINDE_CLIENT_ID"),
+  kindeClientSecret: envValue("KINDE_CLIENT_SECRET"),
+  razorpayKeyId: envValue("RAZORPAY_KEY_ID"),
+  razorpayKeySecret: envValue("RAZORPAY_KEY_SECRET"),
+  razorpayWebhookSecret: envValue("RAZORPAY_WEBHOOK_SECRET"),
+  razorpayBasicPlanId: envValue("RAZORPAY_BASIC_PLAN_ID"),
   adminEmails: (process.env.ADMIN_EMAILS || "")
     .split(",")
     .map((email) => email.trim().toLowerCase())

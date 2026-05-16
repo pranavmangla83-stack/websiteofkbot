@@ -38,9 +38,14 @@ export function verifySubscriptionCheckoutSignature({ razorpayPaymentId, razorpa
     return false;
   }
 
+  return matchesSignature(razorpaySignature, `${razorpayPaymentId}|${razorpaySubscriptionId}`)
+    || matchesSignature(razorpaySignature, `${razorpaySubscriptionId}|${razorpayPaymentId}`);
+}
+
+function matchesSignature(razorpaySignature, payload) {
   const expectedSignature = crypto
     .createHmac("sha256", env.razorpayKeySecret)
-    .update(`${razorpayPaymentId}|${razorpaySubscriptionId}`)
+    .update(payload)
     .digest("hex");
 
   if (razorpaySignature.length !== expectedSignature.length) return false;

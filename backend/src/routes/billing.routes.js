@@ -93,14 +93,23 @@ billingRouter.post("/verify-checkout", requireAuth, async (req, res, next) => {
       razorpay_signature: razorpaySignature
     } = req.body || {};
 
-    const isValid = verifySubscriptionCheckoutSignature({
+    let isValid = verifySubscriptionCheckoutSignature({
       razorpayPaymentId,
       razorpaySubscriptionId,
       razorpaySignature
     });
 
     if (!isValid) {
-      return res.status(400).json({ error: "Invalid Razorpay checkout signature" });
+      isValid = await verifyCheckoutWithRazorpayApi({
+        razorpayPaymentId,
+        razorpaySubscriptionId
+      });
+    }
+
+    if (!isValid) {
+      return res.status(400).json({
+        error: "Payment could not be verified with Razorpay. Confirm the deployed Razorpay key secret matches the key id used for checkout."
+      });
     }
 
     const account = await getCurrentAccount(req.auth);
@@ -351,6 +360,20 @@ function subscriptionCheckoutResponse({ account, plan, subscriptionId, subscript
       }
     }
   };
+}
+
+async function verifyCheckoutWithRazorpayApi({ razorpayPaymentId, razorpaySubscriptionId }) {
+  if (!razorpayPaymentId || !razorpaySubscriptionId) return false;
+
+  const [payment, subscription] = await Promise.all([
+    getRazorpay().payments.fetch(razorpayPaymentId),
+    getRazorpay().subscriptions.fetch(razorpaySubscriptionId)
+  ]);
+
+  return payment?.subscription_id === razorpaySubscriptionId
+    && subscription?.id === razorpaySubscriptionId
+    && subscription?.plan_id === env.razorpayBasicPlanId
+    && ["authorized", "captured"].includes(String(payment?.status || "").toLowerCase());
 }
 
 async function assertRazorpayPlanMatchesLocalPlan(plan) {
