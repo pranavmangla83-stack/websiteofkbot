@@ -39,7 +39,7 @@ documentsRouter.get("/", requireAuth, async (req, res, next) => {
   }
 });
 
-documentsRouter.post("/upload", requireAuth, loadAccount, enforcePdfUploadAllowed, upload.single("pdf"), async (req, res, next) => {
+documentsRouter.post("/upload", requireAuth, loadAccount, upload.single("pdf"), async (req, res, next) => {
   try {
     const account = req.account;
     const file = req.file;
@@ -65,6 +65,43 @@ documentsRouter.post("/upload", requireAuth, loadAccount, enforcePdfUploadAllowe
     });
     const objectPath = objectPathFromStoragePath(storagePath);
 
+    let inserted;
+    try {
+      inserted = await withTransaction(async (db) => {
+        await db.query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))", [account.client.id]);
+        await assertCanUploadPdf(db, account);
+
+        return db.query(
+          `
+            INSERT INTO documents (
+              id,
+              user_id,
+              client_id,
+              chatbot_id,
+              file_name,
+              file_size,
+              storage_path,
+              status
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            RETURNING id, file_name, file_size, storage_path, status, error_message, source_type, ocr_confidence, created_at, updated_at
+          `,
+          [
+            documentId,
+            account.client.id,
+            account.client.id,
+            account.chatbot.id,
+            file.originalname,
+            file.size,
+            storagePath,
+            DOCUMENT_STATUS.UPLOADING
+          ]
+        );
+      });
+    } catch (error) {
+      throw error;
+    }
+
     const { error: uploadError } = await getSupabaseAdmin().storage
       .from(PDF_BUCKET)
       .upload(objectPath, file.buffer, {
@@ -73,48 +110,21 @@ documentsRouter.post("/upload", requireAuth, loadAccount, enforcePdfUploadAllowe
       });
 
     if (uploadError) {
-      throw Object.assign(new Error(uploadError.message), {
-        statusCode: 500,
-        publicMessage: "PDF upload storage failed. Please try again in a few minutes."
-      });
-    }
-
-    let inserted;
-    try {
-      inserted = await query(
-        `
-          INSERT INTO documents (
-            id,
-            user_id,
-            client_id,
-            chatbot_id,
-            file_name,
-            file_size,
-            storage_path,
-            status
-          )
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-          RETURNING id, file_name, file_size, storage_path, status, error_message, source_type, ocr_confidence, created_at, updated_at
-        `,
-        [
-          documentId,
-          account.client.id,
-          account.client.id,
-          account.chatbot.id,
-          file.originalname,
-          file.size,
-          storagePath,
-          DOCUMENT_STATUS.UPLOADING
-        ]
-      );
-    } catch (error) {
+      await query("DELETE FROM documents WHERE id = $1 AND client_id = $2", [documentId, account.client.id])
+        .catch((cleanupError) => {
+          console.error(`Failed to clean up PDF row after storage failure for ${documentId}:`, cleanupError);
+        });
       await getSupabaseAdmin().storage
         .from(PDF_BUCKET)
         .remove([objectPath])
         .catch((cleanupError) => {
           console.error(`Failed to clean up orphaned PDF ${objectPath}:`, cleanupError);
         });
-      throw error;
+
+      throw Object.assign(new Error(uploadError.message), {
+        statusCode: 500,
+        publicMessage: "PDF upload storage failed. Please try again in a few minutes."
+      });
     }
 
     processDocument(documentId, { clientId: account.client.id }).catch((error) => {
@@ -133,15 +143,6 @@ documentsRouter.post("/upload", requireAuth, loadAccount, enforcePdfUploadAllowe
 async function loadAccount(req, _res, next) {
   try {
     req.account = await syncUserAndTenant(req.auth);
-    next();
-  } catch (error) {
-    next(error);
-  }
-}
-
-async function enforcePdfUploadAllowed(req, _res, next) {
-  try {
-    await assertCanUploadPdf({ query }, req.account);
     next();
   } catch (error) {
     next(error);

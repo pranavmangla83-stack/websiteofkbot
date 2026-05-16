@@ -2,6 +2,7 @@ import express from "express";
 import { env } from "../config/env.js";
 import { query } from "../db/pool.js";
 import { requireAuth } from "../middleware/auth.js";
+import { DOCUMENT_STATUS, processDocument } from "../services/pdf-processing.js";
 
 export const adminRouter = express.Router();
 
@@ -78,7 +79,61 @@ adminRouter.get("/overview", async (_req, res, next) => {
   }
 });
 
-function requireAdmin(req, res, next) {
+adminRouter.post("/documents/retry-stuck", async (_req, res, next) => {
+  try {
+    const documents = (await query(
+      `
+        SELECT id, client_id
+        FROM documents
+        WHERE status = ANY($1)
+          AND updated_at < now() - interval '15 minutes'
+        ORDER BY updated_at ASC
+        LIMIT 10
+      `,
+      [processingStatuses()]
+    )).rows;
+
+    for (const document of documents) {
+      processDocument(document.id, { clientId: document.client_id }).catch((error) => {
+        console.error(`Admin retry failed for stuck PDF ${document.id}:`, error);
+      });
+    }
+
+    res.json({
+      queued: documents.length,
+      document_ids: documents.map((document) => document.id)
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+adminRouter.post("/documents/:id/retry", async (req, res, next) => {
+  try {
+    if (!isUuid(req.params.id)) {
+      return res.status(400).json({ error: "Valid document id is required." });
+    }
+
+    const document = (await query(
+      "SELECT id, client_id FROM documents WHERE id = $1 LIMIT 1",
+      [req.params.id]
+    )).rows[0];
+
+    if (!document) {
+      return res.status(404).json({ error: "Document not found." });
+    }
+
+    processDocument(document.id, { clientId: document.client_id }).catch((error) => {
+      console.error(`Admin retry failed for PDF ${document.id}:`, error);
+    });
+
+    res.json({ queued: true, document_id: document.id });
+  } catch (error) {
+    next(error);
+  }
+});
+
+export function requireAdmin(req, res, next) {
   const email = String(req.auth?.email || "").toLowerCase();
 
   if (!env.adminEmails.length) {
@@ -92,4 +147,19 @@ function requireAdmin(req, res, next) {
   }
 
   next();
+}
+
+function processingStatuses() {
+  return [
+    DOCUMENT_STATUS.UPLOADING,
+    DOCUMENT_STATUS.EXTRACTING_TEXT,
+    DOCUMENT_STATUS.SCANNED_DETECTED,
+    DOCUMENT_STATUS.RUNNING_OCR,
+    DOCUMENT_STATUS.CREATING_CHUNKS,
+    DOCUMENT_STATUS.SAVING_KNOWLEDGE_BASE
+  ];
+}
+
+function isUuid(value) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value));
 }

@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import express from "express";
 import { query, withTransaction } from "../db/pool.js";
 import { assertCanUseChat } from "../services/entitlements.js";
+import { notifyLeadSubmitted } from "../services/email.js";
 import { createChatAnswer, createEmbedding } from "../services/openai.js";
 
 const FALLBACK_ANSWER = "I don't have that information in the uploaded business documents.";
@@ -172,6 +173,22 @@ chatRouter.post("/lead", chatLimiter, async (req, res, next) => {
       ]
     );
 
+    notifyLeadSubmitted({
+      client: {
+        email: chatbot.client_email,
+        company_name: chatbot.company_name
+      },
+      lead: {
+        name,
+        email,
+        phone,
+        question,
+        sourceUrl
+      }
+    }).catch((error) => {
+      console.error("Lead notification failed:", error);
+    });
+
     res.status(201).json({
       saved: true,
       message: "Thanks. The business team has received your contact details."
@@ -184,12 +201,13 @@ chatRouter.post("/lead", chatLimiter, async (req, res, next) => {
 async function getPublicChatbot({ clientId, chatbotKey }) {
   const result = await query(
     `
-      SELECT id, client_id, website_url
-      FROM chatbots
-      WHERE client_id = $1
-        AND public_embed_key = $2
-        AND is_active = true
-      ORDER BY created_at ASC
+      SELECT cb.id, cb.client_id, cb.website_url, c.email AS client_email, c.company_name
+      FROM chatbots cb
+      JOIN clients c ON c.id = cb.client_id
+      WHERE cb.client_id = $1
+        AND cb.public_embed_key = $2
+        AND cb.is_active = true
+      ORDER BY cb.created_at ASC
       LIMIT 1
     `,
     [clientId, chatbotKey]
@@ -349,22 +367,35 @@ function createChatLimiter({ windowMs, limit }) {
   const buckets = new Map();
 
   return function limitChat(req, res, next) {
+    const clientId = isUuid(req.body?.client_id) ? req.body.client_id : "unknown";
     const sessionId = normalizeSessionId(req.body?.session_id || req.body?.visitor_id);
-    const key = sessionId ? `session:${sessionId}` : `ip:${req.ip || "unknown"}`;
+    const keys = [
+      `client:${clientId}:ip:${req.ip || "unknown"}`
+    ];
+
+    if (sessionId) {
+      keys.push(`client:${clientId}:session:${sessionId}`);
+    }
+
     const now = Date.now();
-    const bucket = buckets.get(key);
 
-    if (!bucket || bucket.resetAt <= now) {
-      buckets.set(key, { count: 1, resetAt: now + windowMs });
-      return next();
+    for (const key of keys) {
+      const bucket = buckets.get(key);
+      if (bucket && bucket.resetAt > now && bucket.count >= limit) {
+        res.set("Retry-After", String(Math.ceil((bucket.resetAt - now) / 1000)));
+        return res.status(429).json({ error: "Too many chat messages. Please wait a minute and try again." });
+      }
     }
 
-    if (bucket.count >= limit) {
-      res.set("Retry-After", String(Math.ceil((bucket.resetAt - now) / 1000)));
-      return res.status(429).json({ error: "Too many chat messages. Please wait a minute and try again." });
+    for (const key of keys) {
+      const bucket = buckets.get(key);
+      if (!bucket || bucket.resetAt <= now) {
+        buckets.set(key, { count: 1, resetAt: now + windowMs });
+      } else {
+        bucket.count += 1;
+      }
     }
 
-    bucket.count += 1;
     next();
 
     if (buckets.size > 10000) {

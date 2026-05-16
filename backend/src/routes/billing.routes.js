@@ -178,6 +178,60 @@ billingRouter.get("/status", requireAuth, async (req, res, next) => {
   }
 });
 
+billingRouter.post("/cancel-subscription", requireAuth, async (req, res, next) => {
+  try {
+    requireEnv(["razorpayKeyId", "razorpayKeySecret"]);
+
+    const account = await getCurrentAccount(req.auth);
+    if (!account) {
+      return res.status(404).json({ error: "User account not found" });
+    }
+
+    const subscription = account.subscription;
+    if (!subscription?.razorpay_subscription_id) {
+      return res.status(404).json({ error: "No Razorpay subscription found for this account." });
+    }
+
+    if (paymentStateForSubscription(subscription) === "cancelled") {
+      return res.status(409).json({ error: "Subscription is already cancelled." });
+    }
+
+    const razorpaySubscription = await getRazorpay().subscriptions.cancel(
+      subscription.razorpay_subscription_id,
+      true
+    );
+
+    const razorpayStatus = String(razorpaySubscription.status || subscription.status || "").toLowerCase();
+    const localStatus = ["active", "authenticated"].includes(razorpayStatus)
+      ? "cancel_requested"
+      : razorpayStatus || subscription.status;
+
+    await query(
+      `
+        UPDATE subscriptions
+        SET status = $2,
+            end_date = CASE WHEN $3::bigint IS NULL THEN end_date ELSE to_timestamp($3) END,
+            updated_at = now()
+        WHERE id = $1
+      `,
+      [
+        subscription.id,
+        localStatus,
+        razorpaySubscription.current_end || razorpaySubscription.ended_at || null
+      ]
+    );
+
+    res.json({
+      cancelled: true,
+      cancel_at_cycle_end: true,
+      subscription_status: razorpaySubscription.status,
+      current_end: razorpaySubscription.current_end || null
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 export async function handleRazorpayWebhook(req, res, next) {
   try {
     const signature = req.get("x-razorpay-signature");
@@ -216,7 +270,10 @@ async function processRazorpayEvent(event) {
           UPDATE subscriptions
           SET
             razorpay_customer_id = COALESCE($2, razorpay_customer_id),
-            status = $3,
+            status = CASE
+              WHEN status = 'cancel_requested' AND lower($3) IN ('active', 'authenticated') THEN status
+              ELSE $3
+            END,
             start_date = CASE WHEN $4::bigint IS NULL THEN start_date ELSE to_timestamp($4) END,
             end_date = CASE WHEN $5::bigint IS NULL THEN end_date ELSE to_timestamp($5) END,
             updated_at = now()
@@ -264,7 +321,15 @@ async function processRazorpayEvent(event) {
     const statusFromEvent = statusForEvent(eventType);
     if (subscription && statusFromEvent) {
       await client.query(
-        "UPDATE subscriptions SET status = $2, updated_at = now() WHERE id = $1",
+        `
+          UPDATE subscriptions
+          SET status = CASE
+              WHEN status = 'cancel_requested' AND $2 = 'active' THEN status
+              ELSE $2
+            END,
+            updated_at = now()
+          WHERE id = $1
+        `,
         [subscription.id, statusFromEvent]
       );
 
@@ -319,6 +384,7 @@ function paymentStateForSubscription(subscription) {
 
   const status = String(subscription.status || "").toLowerCase();
   if (status === "active") return "active";
+  if (status === "cancel_requested") return "cancel_requested";
   if (["payment_failed", "past_due", "halted", "paused"].includes(status)) return "payment_failed";
   if (["cancelled", "canceled", "completed", "expired"].includes(status)) return "cancelled";
 

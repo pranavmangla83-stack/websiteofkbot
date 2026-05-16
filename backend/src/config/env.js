@@ -24,6 +24,9 @@ export const env = {
   razorpayKeySecret: envValue("RAZORPAY_KEY_SECRET"),
   razorpayWebhookSecret: envValue("RAZORPAY_WEBHOOK_SECRET"),
   razorpayBasicPlanId: envValue("RAZORPAY_BASIC_PLAN_ID"),
+  resendApiKey: envValue("RESEND_API_KEY"),
+  supportEmail: envValue("SUPPORT_EMAIL") || "Support@customaichatbot.online",
+  notificationFromEmail: envValue("NOTIFICATION_FROM_EMAIL") || "Custom AI Chatbot <onboarding@resend.dev>",
   adminEmails: (process.env.ADMIN_EMAILS || "")
     .split(",")
     .map((email) => email.trim().toLowerCase())
@@ -50,6 +53,9 @@ const envKeyNames = {
   razorpayKeySecret: "RAZORPAY_KEY_SECRET",
   razorpayWebhookSecret: "RAZORPAY_WEBHOOK_SECRET",
   razorpayBasicPlanId: "RAZORPAY_BASIC_PLAN_ID",
+  resendApiKey: "RESEND_API_KEY",
+  supportEmail: "SUPPORT_EMAIL",
+  notificationFromEmail: "NOTIFICATION_FROM_EMAIL",
   adminEmails: "ADMIN_EMAILS"
 };
 

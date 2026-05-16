@@ -351,7 +351,7 @@ function ensureChunks(chunks) {
   }
 
   if (chunks.length > MAX_CHUNKS_PER_DOCUMENT) {
-    throw new Error(`PDF is too large for MVP processing. Please upload a smaller PDF with fewer than ${MAX_CHUNKS_PER_DOCUMENT} text chunks.`);
+    throw new Error(`PDF is too large for processing. Please upload a smaller PDF with fewer than ${MAX_CHUNKS_PER_DOCUMENT} text chunks.`);
   }
 }
 
@@ -470,7 +470,7 @@ function safeRenderScale(viewport, preferredScale) {
 
 function ensurePageLimit(pageCount) {
   if (pageCount && pageCount > MAX_PDF_PAGES) {
-    throw new Error(`PDF is too large for MVP processing. Please upload a PDF with ${MAX_PDF_PAGES} pages or fewer.`);
+    throw new Error(`PDF is too large for processing. Please upload a PDF with ${MAX_PDF_PAGES} pages or fewer.`);
   }
 }
 

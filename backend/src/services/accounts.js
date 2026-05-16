@@ -83,7 +83,8 @@ export async function getClientSubscription(db, clientId) {
 }
 
 export function isSubscriptionActive(subscription) {
-  return Boolean(subscription && subscription.status === "active");
+  const status = String(subscription?.status || "").toLowerCase();
+  return ["active", "cancel_requested"].includes(status);
 }
 
 async function ensureDefaultChatbot(db, clientAccount) {

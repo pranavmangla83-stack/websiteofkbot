@@ -266,6 +266,7 @@ async function renderDashboardState() {
   const planElement = document.querySelector("[data-plan-name]");
   const accessElement = document.querySelector("[data-dashboard-access]");
   const subscribeButton = document.querySelector("[data-subscribe-basic]");
+  const cancelButton = document.querySelector("[data-cancel-basic]");
   const errorElement = document.querySelector("[data-dashboard-error]");
 
   try {
@@ -279,6 +280,7 @@ async function renderDashboardState() {
     setText(accessElement, billingAccessLabel(paymentState, billing.dashboard_access_allowed));
     setButtonEnabled(subscribeButton, !billing.active && !billing.checkout_pending);
     if (subscribeButton) subscribeButton.textContent = billingButtonLabel(paymentState, billing.checkout_pending);
+    setCancelButtonVisible(cancelButton, billing.active && paymentState !== "cancel_requested");
     setDashboardSetupVisible(Boolean(billing.active));
 
     document.querySelectorAll("[data-company-name]").forEach(function (element) {
@@ -298,6 +300,7 @@ async function renderDashboardState() {
     setText(errorElement, "Backend API is not reachable at the configured URL. Deploy the backend or update productionBackendUrl.");
     setDashboardSetupVisible(false);
     setButtonEnabled(subscribeButton, false);
+    setCancelButtonVisible(cancelButton, false);
   }
 }
 
@@ -306,6 +309,53 @@ document.addEventListener("click", async function (event) {
   if (adminRefresh) {
     event.preventDefault();
     await renderAdminState();
+    return;
+  }
+
+  const adminRetryStuck = event.target.closest("[data-admin-retry-stuck]");
+  if (adminRetryStuck) {
+    event.preventDefault();
+    const statusElement = document.querySelector("[data-admin-status]");
+    setButtonEnabled(adminRetryStuck, false);
+    setText(statusElement, "Checking for stuck PDFs...");
+
+    try {
+      const result = await apiFetch("/api/admin/documents/retry-stuck", { method: "POST" });
+      setText(statusElement, result.queued
+        ? `Retry queued for ${result.queued} stuck PDF(s). Refresh in a minute.`
+        : "No stuck PDFs found."
+      );
+    } catch (error) {
+      console.error("Stuck PDF retry failed:", error);
+      setText(statusElement, error.message || "Could not retry stuck PDFs.");
+    } finally {
+      setButtonEnabled(adminRetryStuck, true);
+    }
+    return;
+  }
+
+  const cancelButton = event.target.closest("[data-cancel-basic]");
+  if (cancelButton) {
+    event.preventDefault();
+    if (!window.confirm("Cancel future billing for the Basic plan? Your plan stays active until the current billing cycle ends.")) {
+      return;
+    }
+
+    const statusElement = document.querySelector("[data-dashboard-error]");
+    setButtonEnabled(cancelButton, false);
+    cancelButton.textContent = "Cancelling...";
+    setText(statusElement, "Cancelling future billing...");
+
+    try {
+      await apiFetch("/api/billing/cancel-subscription", { method: "POST" });
+      setText(statusElement, "Future billing is cancelled. Basic stays active until the current billing cycle ends.");
+      await renderDashboardState();
+    } catch (error) {
+      console.error("Subscription cancellation failed:", error);
+      setText(statusElement, error.message || "Could not cancel future billing. Please contact support.");
+      setButtonEnabled(cancelButton, true);
+      cancelButton.textContent = "Cancel future billing";
+    }
     return;
   }
 
@@ -667,6 +717,7 @@ function billingStatusLabel(state) {
   const labels = {
     trial: "Basic not active",
     active: "Basic active",
+    cancel_requested: "Cancellation scheduled",
     payment_failed: "Payment failed",
     cancelled: "Cancelled"
   };
@@ -675,6 +726,7 @@ function billingStatusLabel(state) {
 }
 
 function billingAccessLabel(state, accessAllowed) {
+  if (state === "cancel_requested") return "Future billing is cancelled. Basic stays active until the current billing cycle ends.";
   if (accessAllowed) return "Basic plan limits are active";
   if (state === "payment_failed") return "Payment failed. Basic features are locked until payment is restored.";
   if (state === "cancelled") return "Subscription cancelled. Basic features are locked.";
@@ -683,6 +735,7 @@ function billingAccessLabel(state, accessAllowed) {
 
 function billingButtonLabel(state, checkoutPending) {
   if (state === "active") return "Basic active";
+  if (state === "cancel_requested") return "Basic active";
   if (checkoutPending) return "Activation pending";
   if (state === "payment_failed") return "Retry ₹350/month payment";
   if (state === "cancelled") return "Restart Basic - ₹350/month";
@@ -828,4 +881,11 @@ function setDashboardSetupVisible(visible) {
   document.querySelectorAll("[data-billing-setup]").forEach(function (element) {
     element.classList.toggle("hidden", !visible);
   });
+}
+
+function setCancelButtonVisible(button, visible) {
+  if (!button) return;
+  button.classList.toggle("hidden", !visible);
+  button.textContent = "Cancel future billing";
+  setButtonEnabled(button, visible);
 }

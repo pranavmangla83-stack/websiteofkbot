@@ -329,7 +329,7 @@ BEGIN
       'client-pdfs',
       'client-pdfs',
       false,
-      52428800,
+      7340032,
       ARRAY['application/pdf']
     )
     ON CONFLICT (id) DO UPDATE SET

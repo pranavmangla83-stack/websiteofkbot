@@ -23,7 +23,7 @@
       <nav class="flex items-center gap-3 text-sm">
         <span data-user-email class="hidden text-slate-600 sm:inline" data-auth-user></span>
         <a href="/dashboard.html" class="rounded-lg border border-slate-200 px-4 py-2 font-bold">Dashboard</a>
-        <a href="/" data-kinde-logout class="rounded-lg bg-slate-950 px-4 py-2 font-bold text-white">Logout</a>
+        <a href="/" data-kinde-logout data-auth-user class="hidden rounded-lg bg-slate-950 px-4 py-2 font-bold text-white">Logout</a>
       </nav>
     </div>
   </header>
@@ -36,6 +36,9 @@
       </div>
       <button type="button" data-admin-refresh class="rounded-lg bg-[#c96f4a] px-5 py-3 text-sm font-bold text-white">
         Refresh
+      </button>
+      <button type="button" data-admin-retry-stuck class="rounded-lg border border-slate-200 bg-white px-5 py-3 text-sm font-bold text-slate-900">
+        Retry stuck PDFs
       </button>
     </div>
 
