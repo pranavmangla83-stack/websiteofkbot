@@ -4,6 +4,7 @@ import helmet from "helmet";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { env } from "./config/env.js";
+import { blockScannerTraffic } from "./middleware/bot-blocker.js";
 import { errorHandler, notFound } from "./middleware/errors.js";
 import { requireAuth } from "./middleware/auth.js";
 import { adminRouter, requireAdmin } from "./routes/admin.routes.js";
@@ -41,6 +42,7 @@ app.set("trust proxy", 1);
 app.use(helmet({
   crossOriginResourcePolicy: { policy: "cross-origin" }
 }));
+app.use(blockScannerTraffic);
 
 app.post(
   "/api/billing/webhook",
@@ -76,6 +78,11 @@ app.use("/api/test-db", adminCors, requireAuth, requireAdmin, testDbRouter);
 app.use(publicCors, widgetRouter);
 
 app.use("/assets", express.static(path.join(projectRoot, "assets")));
+
+app.get("/robots.txt", (_req, res) => {
+  res.type("text/plain");
+  res.sendFile(path.join(projectRoot, "robots.txt"));
+});
 
 const frontendRoutes = new Map([
   ["/", "index.html"],

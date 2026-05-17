@@ -8,6 +8,7 @@ import { createWorker } from "tesseract.js";
 import { query, withTransaction } from "../db/pool.js";
 import { getSupabaseAdmin } from "../lib/supabase.js";
 import { createEmbedding } from "./openai.js";
+import { env } from "../config/env.js";
 
 export const PDF_BUCKET = "client-pdfs";
 const CHUNK_TARGET_CHARS = 4200;
@@ -35,6 +36,10 @@ export const DOCUMENT_STATUS = {
 const LOW_QUALITY_OCR_MESSAGE = "This scanned PDF quality is low. Please upload a clearer PDF for better chatbot accuracy.";
 
 export async function processDocument(documentId, { clientId } = {}) {
+  return enqueuePdfProcessing(() => processDocumentNow(documentId, { clientId }));
+}
+
+async function processDocumentNow(documentId, { clientId } = {}) {
   if (!clientId) {
     throw new Error("clientId is required to process a document.");
   }
@@ -159,6 +164,32 @@ export async function processDocument(documentId, { clientId } = {}) {
     });
 
     throw error;
+  }
+}
+
+const pdfProcessingQueue = [];
+let activePdfProcessingJobs = 0;
+
+function enqueuePdfProcessing(job) {
+  return new Promise((resolve, reject) => {
+    pdfProcessingQueue.push({ job, resolve, reject });
+    drainPdfProcessingQueue();
+  });
+}
+
+function drainPdfProcessingQueue() {
+  const concurrency = Math.max(1, env.pdfProcessingConcurrency);
+
+  while (activePdfProcessingJobs < concurrency && pdfProcessingQueue.length) {
+    const queued = pdfProcessingQueue.shift();
+    activePdfProcessingJobs += 1;
+
+    queued.job()
+      .then(queued.resolve, queued.reject)
+      .finally(() => {
+        activePdfProcessingJobs -= 1;
+        drainPdfProcessingQueue();
+      });
   }
 }
 

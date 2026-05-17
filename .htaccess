@@ -1,3 +1,12 @@
 <IfModule LiteSpeed>
   LsRecaptcha 0
 </IfModule>
+
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+
+  # Drop common scanner traffic before it reaches the Node app.
+  RewriteCond %{REQUEST_URI} ^/(wp-admin|wp-login\.php|wp-content|wp-includes|xmlrpc\.php|wordpress|phpmyadmin|pma|adminer|\.env|\.git|vendor|composer\.(json|lock)) [NC,OR]
+  RewriteCond %{HTTP_USER_AGENT} (python|aiohttp|curl|wget|nikto|sqlmap|masscan|zgrab|headlesschrome) [NC]
+  RewriteRule ^ - [F,L]
+</IfModule>

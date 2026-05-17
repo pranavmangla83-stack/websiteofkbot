@@ -8,7 +8,10 @@ export function getPool() {
 
   if (!pool) {
     pool = new pg.Pool({
-      connectionString: env.databaseUrl
+      connectionString: env.databaseUrl,
+      max: env.pgPoolMax,
+      idleTimeoutMillis: 10_000,
+      connectionTimeoutMillis: 10_000
     });
   }
 

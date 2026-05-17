@@ -3,10 +3,16 @@ import dotenv from "dotenv";
 dotenv.config();
 
 const envValue = (key) => process.env[key]?.trim();
+const numberEnv = (key, fallback) => {
+  const value = Number(envValue(key));
+  return Number.isFinite(value) && value > 0 ? value : fallback;
+};
 
 export const env = {
-  port: Number(envValue("PORT") || 4000),
+  port: numberEnv("PORT", 4000),
   host: envValue("HOST") || "0.0.0.0",
+  pgPoolMax: numberEnv("PG_POOL_MAX", 3),
+  pdfProcessingConcurrency: numberEnv("PDF_PROCESSING_CONCURRENCY", 1),
   databaseUrl: envValue("DATABASE_URL"),
   supabaseUrl: envValue("SUPABASE_URL"),
   supabaseAnonKey: envValue("SUPABASE_ANON_KEY"),
@@ -36,6 +42,8 @@ export const env = {
 const envKeyNames = {
   port: "PORT",
   host: "HOST",
+  pgPoolMax: "PG_POOL_MAX",
+  pdfProcessingConcurrency: "PDF_PROCESSING_CONCURRENCY",
   databaseUrl: "DATABASE_URL",
   supabaseUrl: "SUPABASE_URL",
   supabaseAnonKey: "SUPABASE_ANON_KEY",
