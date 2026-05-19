@@ -6,7 +6,7 @@ import { getSupabaseAdmin } from "../lib/supabase.js";
 import { requireAuth } from "../middleware/auth.js";
 import { assertCanUploadPdf } from "../services/entitlements.js";
 import { syncUserAndTenant } from "../services/accounts.js";
-import { DOCUMENT_STATUS, buildStoragePath, objectPathFromStoragePath, PDF_BUCKET, processDocument } from "../services/pdf-processing.js";
+import { DOCUMENT_STATUS, buildStoragePath, objectPathFromStoragePath, PDF_BUCKET } from "../services/pdf-metadata.js";
 
 const MAX_PDF_BYTES = 7 * 1024 * 1024;
 
@@ -209,4 +209,9 @@ async function getOwnedDocument(documentId, clientId) {
 
 function isUuid(value) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value));
+}
+
+async function processDocument(documentId, options) {
+  const { processDocument: runProcessDocument } = await import("../services/pdf-processing.js");
+  return runProcessDocument(documentId, options);
 }

@@ -9,8 +9,8 @@ import { query, withTransaction } from "../db/pool.js";
 import { getSupabaseAdmin } from "../lib/supabase.js";
 import { createEmbedding } from "./openai.js";
 import { env } from "../config/env.js";
+import { DOCUMENT_STATUS, objectPathFromStoragePath, PDF_BUCKET } from "./pdf-metadata.js";
 
-export const PDF_BUCKET = "client-pdfs";
 const CHUNK_TARGET_CHARS = 4200;
 const CHUNK_OVERLAP_CHARS = 600;
 const MAX_CHUNKS_PER_DOCUMENT = 250;
@@ -21,17 +21,6 @@ const OCR_RENDER_SCALE = 2;
 const MAX_OCR_RENDER_PIXELS = 8_000_000;
 const OCR_PAGE_TIMEOUT_MS = 90_000;
 const MIN_OCR_CONFIDENCE = 45;
-
-export const DOCUMENT_STATUS = {
-  UPLOADING: "uploading_pdf",
-  EXTRACTING_TEXT: "extracting_pdf_text",
-  SCANNED_DETECTED: "scanned_pdf_detected",
-  RUNNING_OCR: "running_ocr",
-  CREATING_CHUNKS: "creating_chunks",
-  SAVING_KNOWLEDGE_BASE: "saving_knowledge_base",
-  COMPLETED: "completed",
-  FAILED: "failed"
-};
 
 const LOW_QUALITY_OCR_MESSAGE = "This scanned PDF quality is low. Please upload a clearer PDF for better chatbot accuracy.";
 
@@ -302,17 +291,6 @@ export function splitTextIntoChunks(text) {
     }
     return parts.filter(Boolean);
   });
-}
-
-export function buildStoragePath({ userId, clientId, documentId, fileName }) {
-  const safeFileName = fileName.replace(/[^a-zA-Z0-9._-]/g, "_");
-  return `${PDF_BUCKET}/${userId}/${clientId}/${documentId}/${safeFileName}`;
-}
-
-export function objectPathFromStoragePath(storagePath) {
-  return storagePath.startsWith(`${PDF_BUCKET}/`)
-    ? storagePath.slice(PDF_BUCKET.length + 1)
-    : storagePath;
 }
 
 function getDocumentForProcessing(documentId, { clientId } = {}) {

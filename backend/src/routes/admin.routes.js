@@ -2,7 +2,7 @@ import express from "express";
 import { env } from "../config/env.js";
 import { query } from "../db/pool.js";
 import { requireAuth } from "../middleware/auth.js";
-import { DOCUMENT_STATUS, processDocument } from "../services/pdf-processing.js";
+import { DOCUMENT_STATUS } from "../services/pdf-metadata.js";
 
 export const adminRouter = express.Router();
 
@@ -162,4 +162,9 @@ function processingStatuses() {
 
 function isUuid(value) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value));
+}
+
+async function processDocument(documentId, options) {
+  const { processDocument: runProcessDocument } = await import("../services/pdf-processing.js");
+  return runProcessDocument(documentId, options);
 }
