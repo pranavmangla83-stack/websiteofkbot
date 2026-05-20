@@ -11,6 +11,7 @@ const authIntentStorageKey = "kbot_auth_intent";
 let kindeClient;
 let currentAccount;
 let redirectingAfterAuth = false;
+let authFlowStarting = false;
 
 initAuth();
 
@@ -100,23 +101,36 @@ function bindAuthButtons() {
 }
 
 async function startAuthFlow(type, element) {
-  const redirectTo = normalizeRedirectPath(element.getAttribute("data-redirect-to")) || dashboardPath;
-  const isAuthenticated = await kindeClient.isAuthenticated();
+  if (authFlowStarting) return;
+  authFlowStarting = true;
+  if (element) element.dataset.authStarting = "true";
 
-  if (isAuthenticated) {
-    window.location.assign(redirectTo);
-    return;
+  try {
+    const redirectTo = normalizeRedirectPath(element?.getAttribute("data-redirect-to")) || dashboardPath;
+    const isAuthenticated = await kindeClient.isAuthenticated();
+
+    if (isAuthenticated) {
+      window.location.assign(redirectTo);
+      return;
+    }
+
+    storeRedirect(redirectTo);
+    storeAuthIntent(redirectTo);
+    setButtonEnabled(element, false);
+    const options = { app_state: { redirectTo } };
+
+    if (type === "login") {
+      await kindeClient.login(options);
+      return;
+    }
+
+    await kindeClient.register(options);
+  } catch (error) {
+    authFlowStarting = false;
+    if (element) delete element.dataset.authStarting;
+    setButtonEnabled(element, true);
+    throw error;
   }
-
-  storeRedirect(redirectTo);
-  storeAuthIntent(redirectTo);
-  const options = { app_state: { redirectTo } };
-  if (type === "login") {
-    await kindeClient.login(options);
-    return;
-  }
-
-  await kindeClient.register(options);
 }
 
 async function redirectAuthenticatedIntent() {
@@ -315,6 +329,8 @@ document.addEventListener("click", async function (event) {
   const adminRetryStuck = event.target.closest("[data-admin-retry-stuck]");
   if (adminRetryStuck) {
     event.preventDefault();
+    if (adminRetryStuck.disabled) return;
+
     const statusElement = document.querySelector("[data-admin-status]");
     setButtonEnabled(adminRetryStuck, false);
     setText(statusElement, "Checking for stuck PDFs...");
@@ -337,6 +353,8 @@ document.addEventListener("click", async function (event) {
   const cancelButton = event.target.closest("[data-cancel-basic]");
   if (cancelButton) {
     event.preventDefault();
+    if (cancelButton.disabled) return;
+
     if (!window.confirm("Cancel future billing for the Basic plan? Your plan stays active until the current billing cycle ends.")) {
       return;
     }
@@ -363,6 +381,8 @@ document.addEventListener("click", async function (event) {
   if (!subscribeButton) return;
 
   event.preventDefault();
+  if (subscribeButton.disabled) return;
+
   const statusElement = document.querySelector("[data-dashboard-error]");
   setButtonEnabled(subscribeButton, false);
   subscribeButton.textContent = "Preparing checkout...";
@@ -385,10 +405,13 @@ document.addEventListener("submit", async function (event) {
   if (!websiteForm) return;
 
   event.preventDefault();
+  if (websiteForm.dataset.saving === "true") return;
+
   const input = websiteForm.querySelector("[data-website-url-input]");
   const statusElement = document.querySelector("[data-website-url-status]");
   const button = websiteForm.querySelector("button[type='submit']");
 
+  websiteForm.dataset.saving = "true";
   setButtonEnabled(button, false);
   setText(statusElement, "Saving website URL...");
 
@@ -407,6 +430,7 @@ document.addEventListener("submit", async function (event) {
     console.error("Website URL save failed:", error);
     setText(statusElement, error.message || "Could not save website URL.");
   } finally {
+    delete websiteForm.dataset.saving;
     setButtonEnabled(button, true);
   }
 });
@@ -416,9 +440,12 @@ document.addEventListener("submit", async function (event) {
   if (!form) return;
 
   event.preventDefault();
+  if (form.dataset.uploading === "true") return;
+
   const input = form.querySelector("[data-pdf-input]");
   const file = input?.files?.[0];
   const statusElement = document.querySelector("[data-documents-status]");
+  const button = form.querySelector("button[type='submit']");
 
   if (!file) {
     setText(statusElement, "Choose a PDF first.");
@@ -428,6 +455,8 @@ document.addEventListener("submit", async function (event) {
   const body = new FormData();
   body.append("pdf", file);
 
+  form.dataset.uploading = "true";
+  setButtonEnabled(button, false);
   setText(statusElement, "Uploading PDF...");
 
   try {
@@ -442,6 +471,9 @@ document.addEventListener("submit", async function (event) {
   } catch (error) {
     console.error("PDF upload failed:", error);
     setText(statusElement, error.message || "PDF upload failed.");
+  } finally {
+    delete form.dataset.uploading;
+    setButtonEnabled(button, true);
   }
 });
 
@@ -450,9 +482,11 @@ document.addEventListener("click", async function (event) {
   if (!deleteButton) return;
 
   event.preventDefault();
+  if (deleteButton.disabled) return;
+
   const id = deleteButton.getAttribute("data-delete-document");
   const statusElement = document.querySelector("[data-documents-status]");
-  deleteButton.disabled = true;
+  setButtonEnabled(deleteButton, false);
   setText(statusElement, "Deleting document...");
 
   try {
@@ -462,7 +496,7 @@ document.addEventListener("click", async function (event) {
   } catch (error) {
     console.error("Document delete failed:", error);
     setText(statusElement, error.message || "Document delete failed.");
-    deleteButton.disabled = false;
+    setButtonEnabled(deleteButton, true);
   }
 });
 

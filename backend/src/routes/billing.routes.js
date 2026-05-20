@@ -15,9 +15,6 @@ billingRouter.post("/create-subscription", requireAuth, async (req, res, next) =
     requireEnv(["razorpayKeyId", "razorpayKeySecret", "razorpayWebhookSecret", "razorpayBasicPlanId"]);
 
     const account = await syncUserAndTenant(req.auth);
-    if (isSubscriptionActive(account.subscription)) {
-      return res.status(409).json({ error: "Basic subscription is already active." });
-    }
 
     const plan = (await query(
       "SELECT * FROM plans WHERE name = $1 AND is_active = true LIMIT 1",
@@ -30,54 +27,77 @@ billingRouter.post("/create-subscription", requireAuth, async (req, res, next) =
 
     await assertRazorpayPlanMatchesLocalPlan(plan);
 
-    if (isAwaitingWebhookActivation(account.subscription)) {
-      return res.status(409).json({
-        error: "Payment is verified. Your Basic plan is being activated. Please refresh in a minute."
-      });
-    }
+    const checkout = await withTransaction(async (db) => {
+      await db.query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))", [`billing:${account.client.id}`]);
 
-    if (await isReusableCheckoutSubscription(account.subscription)) {
-      return res.json(subscriptionCheckoutResponse({
-        account,
-        plan,
-        subscriptionId: account.subscription.razorpay_subscription_id,
-        subscriptionStatus: account.subscription.status
-      }));
-    }
+      const latestSubscription = await getLatestClientSubscription(db, account.client.id);
+      const lockedAccount = { ...account, subscription: latestSubscription };
 
-    const subscription = await getRazorpay().subscriptions.create({
-      plan_id: env.razorpayBasicPlanId,
-      total_count: 120,
-      quantity: 1,
-      customer_notify: 1,
-      notes: {
-        client_id: account.client.id,
-        local_plan_id: plan.id,
-        plan_name: plan.display_name
+      if (isSubscriptionActive(latestSubscription)) {
+        return {
+          status: 409,
+          body: { error: "Basic subscription is already active." }
+        };
       }
+
+      if (isAwaitingWebhookActivation(latestSubscription)) {
+        return {
+          status: 409,
+          body: { error: "Payment is verified. Your Basic plan is being activated. Please refresh in a minute." }
+        };
+      }
+
+      if (await isReusableCheckoutSubscription(latestSubscription)) {
+        return {
+          status: 200,
+          body: subscriptionCheckoutResponse({
+            account: lockedAccount,
+            plan,
+            subscriptionId: latestSubscription.razorpay_subscription_id,
+            subscriptionStatus: latestSubscription.status
+          })
+        };
+      }
+
+      const subscription = await getRazorpay().subscriptions.create({
+        plan_id: env.razorpayBasicPlanId,
+        total_count: 120,
+        quantity: 1,
+        customer_notify: 1,
+        notes: {
+          client_id: account.client.id,
+          local_plan_id: plan.id,
+          plan_name: plan.display_name
+        }
+      });
+
+      await db.query(
+        `
+          INSERT INTO subscriptions (
+            client_id,
+            plan_name,
+            razorpay_subscription_id,
+            status
+          )
+          VALUES ($1, $2, $3, $4)
+          ON CONFLICT (razorpay_subscription_id)
+          DO UPDATE SET status = EXCLUDED.status, updated_at = now()
+        `,
+        [account.client.id, plan.display_name, subscription.id, subscription.status || "created"]
+      );
+
+      return {
+        status: 201,
+        body: subscriptionCheckoutResponse({
+          account: lockedAccount,
+          plan,
+          subscriptionId: subscription.id,
+          subscriptionStatus: subscription.status
+        })
+      };
     });
 
-    await query(
-      `
-        INSERT INTO subscriptions (
-          client_id,
-          plan_name,
-          razorpay_subscription_id,
-          status
-        )
-        VALUES ($1, $2, $3, $4)
-        ON CONFLICT (razorpay_subscription_id)
-        DO UPDATE SET status = EXCLUDED.status, updated_at = now()
-      `,
-      [account.client.id, plan.display_name, subscription.id, subscription.status || "created"]
-    );
-
-    res.status(201).json(subscriptionCheckoutResponse({
-      account,
-      plan,
-      subscriptionId: subscription.id,
-      subscriptionStatus: subscription.status
-    }));
+    res.status(checkout.status).json(checkout.body);
   } catch (error) {
     next(error);
   }
@@ -389,6 +409,19 @@ function paymentStateForSubscription(subscription) {
   if (["cancelled", "canceled", "completed", "expired"].includes(status)) return "cancelled";
 
   return "trial";
+}
+
+async function getLatestClientSubscription(db, clientId) {
+  return (await db.query(
+    `
+      SELECT *
+      FROM subscriptions
+      WHERE client_id = $1
+      ORDER BY created_at DESC
+      LIMIT 1
+    `,
+    [clientId]
+  )).rows[0] || null;
 }
 
 async function isReusableCheckoutSubscription(subscription) {
