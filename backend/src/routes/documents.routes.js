@@ -8,12 +8,12 @@ import { assertCanUploadPdf } from "../services/entitlements.js";
 import { syncUserAndTenant } from "../services/accounts.js";
 import { DOCUMENT_STATUS, buildStoragePath, objectPathFromStoragePath, PDF_BUCKET } from "../services/pdf-metadata.js";
 
-const MAX_PDF_BYTES = 7 * 1024 * 1024;
+const MAX_ALLOWED_PDF_BYTES = 10 * 1024 * 1024;
 
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
-    fileSize: MAX_PDF_BYTES,
+    fileSize: MAX_ALLOWED_PDF_BYTES,
     files: 1
   }
 });
@@ -52,10 +52,6 @@ documentsRouter.post("/upload", requireAuth, loadAccount, upload.single("pdf"), 
       return res.status(400).json({ error: "Only PDF files are allowed." });
     }
 
-    if (file.size > MAX_PDF_BYTES) {
-      return res.status(400).json({ error: "PDF must be 7MB or smaller." });
-    }
-
     const documentId = crypto.randomUUID();
     const storagePath = buildStoragePath({
       userId: account.client.id,
@@ -69,7 +65,13 @@ documentsRouter.post("/upload", requireAuth, loadAccount, upload.single("pdf"), 
     try {
       inserted = await withTransaction(async (db) => {
         await db.query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))", [account.client.id]);
-        await assertCanUploadPdf(db, account);
+        const { entitlement } = await assertCanUploadPdf(db, account);
+        if (file.size > entitlement.maxPdfBytes) {
+          throw Object.assign(new Error(`PDF must be ${entitlement.maxPdfSizeMb}MB or smaller for your ${entitlement.planName} plan.`), {
+            statusCode: 400,
+            publicMessage: `PDF must be ${entitlement.maxPdfSizeMb}MB or smaller for your ${entitlement.planName} plan.`
+          });
+        }
 
         return db.query(
           `

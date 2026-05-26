@@ -10,6 +10,7 @@ const authIntentStorageKey = "kbot_auth_intent";
 
 let kindeClient;
 let currentAccount;
+let currentBilling;
 let redirectingAfterAuth = false;
 let authFlowStarting = false;
 
@@ -280,6 +281,7 @@ async function renderDashboardState() {
   const planElement = document.querySelector("[data-plan-name]");
   const accessElement = document.querySelector("[data-dashboard-access]");
   const subscribeButton = document.querySelector("[data-subscribe-basic]");
+  const upgradeButton = document.querySelector("[data-subscribe-pro]");
   const cancelButton = document.querySelector("[data-cancel-basic]");
   const errorElement = document.querySelector("[data-dashboard-error]");
 
@@ -287,15 +289,20 @@ async function renderDashboardState() {
     const account = await apiFetch("/api/me");
     currentAccount = account;
     const billing = await apiFetch("/api/billing/status");
+    currentBilling = billing;
 
     const paymentState = billing.payment_state || (billing.active ? "active" : "trial");
-    setText(statusElement, billingStatusLabel(paymentState));
+    const activePlanKey = planKeyFromBilling(billing);
+    setText(statusElement, billingStatusLabel(paymentState, billing.plan?.name));
     setText(planElement, billing.plan ? `${billing.plan.name} - ₹${billing.plan.price_inr}/${billing.plan.billing_interval}` : "Basic - ₹350/month");
-    setText(accessElement, billingAccessLabel(paymentState, billing.dashboard_access_allowed));
+    setText(accessElement, billingAccessLabel(paymentState, billing.dashboard_access_allowed, billing.plan?.name));
     setButtonEnabled(subscribeButton, !billing.active && !billing.checkout_pending);
+    if (subscribeButton) subscribeButton.classList.toggle("hidden", Boolean(billing.active));
     if (subscribeButton) subscribeButton.textContent = billingButtonLabel(paymentState, billing.checkout_pending);
+    setUpgradeButtonState(upgradeButton, billing, activePlanKey);
     setCancelButtonVisible(cancelButton, billing.active && paymentState !== "cancel_requested");
     setDashboardSetupVisible(Boolean(billing.active));
+    setWebsiteCrawlingEnabled(Boolean(billing.entitlement?.websiteCrawling));
 
     document.querySelectorAll("[data-company-name]").forEach(function (element) {
       element.textContent = account.tenant?.company_name || "Your company";
@@ -305,6 +312,7 @@ async function renderDashboardState() {
       renderWebsiteUrl(account);
       renderEmbedScript(account);
       await renderDocuments();
+      await renderWebsitePages();
     }
   } catch (error) {
     console.error("Dashboard load failed:", error);
@@ -313,7 +321,10 @@ async function renderDashboardState() {
     setText(accessElement, "Checkout is unavailable until the backend API is online.");
     setText(errorElement, "Backend API is not reachable at the configured URL. Deploy the backend or update productionBackendUrl.");
     setDashboardSetupVisible(false);
+    setWebsiteCrawlingEnabled(false);
     setButtonEnabled(subscribeButton, false);
+    setButtonEnabled(upgradeButton, false);
+    if (upgradeButton) upgradeButton.classList.add("hidden");
     setCancelButtonVisible(cancelButton, false);
   }
 }
@@ -355,7 +366,8 @@ document.addEventListener("click", async function (event) {
     event.preventDefault();
     if (cancelButton.disabled) return;
 
-    if (!window.confirm("Cancel future billing for the Basic plan? Your plan stays active until the current billing cycle ends.")) {
+    const planName = currentBilling?.plan?.name || "current";
+    if (!window.confirm(`Cancel future billing for the ${planName} plan? Your plan stays active until the current billing cycle ends.`)) {
       return;
     }
 
@@ -366,7 +378,7 @@ document.addEventListener("click", async function (event) {
 
     try {
       await apiFetch("/api/billing/cancel-subscription", { method: "POST" });
-      setText(statusElement, "Future billing is cancelled. Basic stays active until the current billing cycle ends.");
+      setText(statusElement, `Future billing is cancelled. ${planName} stays active until the current billing cycle ends.`);
       await renderDashboardState();
     } catch (error) {
       console.error("Subscription cancellation failed:", error);
@@ -377,26 +389,30 @@ document.addEventListener("click", async function (event) {
     return;
   }
 
-  const subscribeButton = event.target.closest("[data-subscribe-basic]");
+  const subscribeButton = event.target.closest("[data-subscribe-plan]");
   if (!subscribeButton) return;
 
   event.preventDefault();
   if (subscribeButton.disabled) return;
 
   const statusElement = document.querySelector("[data-dashboard-error]");
+  const planKey = subscribeButton.getAttribute("data-subscribe-plan") || "basic";
   setButtonEnabled(subscribeButton, false);
   subscribeButton.textContent = "Preparing checkout...";
   setText(statusElement, "Creating Razorpay subscription...");
 
   try {
-    const data = await apiFetch("/api/billing/create-subscription", { method: "POST" });
+    const data = await apiFetch("/api/billing/create-subscription", {
+      method: "POST",
+      body: JSON.stringify({ plan: planKey })
+    });
     openRazorpayCheckout(data.checkout, subscribeButton);
     setText(statusElement, "Checkout opened. Complete the Razorpay payment.");
   } catch (error) {
     console.error("Subscription creation failed:", error);
-    setText(statusElement, error.message || "Could not start checkout. Confirm Razorpay env values and the Basic plan id.");
+    setText(statusElement, error.message || "Could not start checkout. Confirm Razorpay env values and the plan id.");
     setButtonEnabled(subscribeButton, true);
-    subscribeButton.textContent = "Start Basic - ₹350/month";
+    resetCheckoutButton(subscribeButton);
   }
 });
 
@@ -497,6 +513,107 @@ document.addEventListener("click", async function (event) {
     console.error("Document delete failed:", error);
     setText(statusElement, error.message || "Document delete failed.");
     setButtonEnabled(deleteButton, true);
+  }
+});
+
+document.addEventListener("click", async function (event) {
+  const scanButton = event.target.closest("[data-scan-website]");
+  if (scanButton) {
+    event.preventDefault();
+    if (scanButton.disabled) return;
+
+    const statusElement = document.querySelector("[data-website-pages-status]");
+    const resultsElement = document.querySelector("[data-website-scan-results]");
+    const crawlUrlInput = document.querySelector("[data-website-crawl-url-input]");
+    const crawlUrl = crawlUrlInput?.value?.trim();
+
+    if (!crawlUrl) {
+      setText(statusElement, "Enter a website URL to scan.");
+      return;
+    }
+
+    setButtonEnabled(scanButton, false);
+    setText(statusElement, "Scanning public website pages...");
+    if (resultsElement) {
+      resultsElement.classList.add("hidden");
+      resultsElement.innerHTML = "";
+    }
+
+    try {
+      const data = await apiFetch("/api/website-pages/scan", {
+        method: "POST",
+        body: JSON.stringify({ url: crawlUrl })
+      });
+      renderWebsiteScanResults(data.pages || []);
+      setText(statusElement, data.pages?.length ? "Select pages to add to chatbot knowledge." : "No public pages found.");
+    } catch (error) {
+      console.error("Website scan failed:", error);
+      setText(statusElement, error.message || "Could not scan website pages.");
+    } finally {
+      setButtonEnabled(scanButton, true);
+    }
+    return;
+  }
+
+  const indexButton = event.target.closest("[data-index-website-pages]");
+  if (indexButton) {
+    event.preventDefault();
+    if (indexButton.disabled) return;
+
+    const resultsElement = document.querySelector("[data-website-scan-results]");
+    const statusElement = document.querySelector("[data-website-pages-status]");
+    const urls = Array.from(document.querySelectorAll("[data-website-page-choice]:checked"))
+      .map((input) => input.value);
+
+    if (!urls.length) {
+      setText(statusElement, "Select at least one page.");
+      return;
+    }
+
+    setButtonEnabled(indexButton, false);
+    setText(statusElement, "Adding website pages to chatbot knowledge...");
+
+    try {
+      const data = await apiFetch("/api/website-pages/index", {
+        method: "POST",
+        body: JSON.stringify({ urls })
+      });
+      const indexedCount = data.indexed?.length || 0;
+      const failedCount = data.failed?.length || 0;
+      setText(statusElement, `Website knowledge updated. Indexed ${indexedCount} page(s). Failed ${failedCount} page(s).`);
+      if (resultsElement) {
+        resultsElement.classList.add("hidden");
+        resultsElement.innerHTML = "";
+      }
+      await renderWebsitePages();
+    } catch (error) {
+      console.error("Website page indexing failed:", error);
+      setText(statusElement, error.message || "Could not add website pages.");
+    } finally {
+      setButtonEnabled(indexButton, true);
+    }
+    return;
+  }
+
+  const deletePageButton = event.target.closest("[data-delete-website-page]");
+  if (!deletePageButton) return;
+
+  event.preventDefault();
+  if (deletePageButton.disabled) return;
+
+  const id = deletePageButton.getAttribute("data-delete-website-page");
+  const statusElement = document.querySelector("[data-website-pages-status]");
+  setButtonEnabled(deletePageButton, false);
+  setText(statusElement, "Deleting website page knowledge...");
+
+  try {
+    await apiFetch(`/api/website-pages/${id}`, { method: "DELETE" });
+    setText(statusElement, "Website page removed.");
+    await renderWebsitePages();
+  } catch (error) {
+    console.error("Website page delete failed:", error);
+    setText(statusElement, error.message || "Could not delete website page.");
+    setButtonEnabled(deletePageButton, true);
   }
 });
 
@@ -608,6 +725,105 @@ async function renderDocuments() {
     listElement.innerHTML = '<div class="px-4 py-4 text-red-600">Could not load documents.</div>';
     return [];
   }
+}
+
+async function renderWebsitePages() {
+  if (!document.body.hasAttribute("data-dashboard-page")) return;
+
+  const listElement = document.querySelector("[data-website-pages-list]");
+  if (!listElement || !currentAccount) return;
+
+  try {
+    const data = await apiFetch("/api/website-pages");
+    const pages = data.pages || [];
+    renderWebsitePageUsage(pages);
+
+    if (!pages.length) {
+      listElement.innerHTML = '<div class="px-4 py-4 text-slate-500">No website pages added yet.</div>';
+      return pages;
+    }
+
+    listElement.innerHTML = pages.map(function (page) {
+      const statusClass = page.status === "indexed" ? "text-emerald-700" : "text-red-700";
+      const label = page.status === "indexed" ? "Indexed" : "Failed";
+      const title = page.title || page.url;
+
+      return `
+        <div class="grid gap-3 px-4 py-3 sm:grid-cols-[minmax(0,1fr)_110px_80px] sm:items-center">
+          <div class="min-w-0">
+            <p class="truncate font-semibold">${escapeHtml(title)}</p>
+            <p class="mt-1 truncate text-xs text-slate-500">${escapeHtml(page.url)}</p>
+            ${page.error_message ? `<p class="mt-1 text-xs text-red-600">${escapeHtml(page.error_message)}</p>` : ""}
+          </div>
+          <span class="text-sm font-bold leading-5 ${statusClass}">${escapeHtml(label)}</span>
+          <button type="button" data-delete-website-page="${page.id}" class="rounded-full border border-slate-200 px-3 py-1.5 text-xs font-bold">Delete</button>
+        </div>
+      `;
+    }).join("");
+    return pages;
+  } catch (error) {
+    console.error("Website pages list failed:", error);
+    renderWebsitePageUsage([]);
+    listElement.innerHTML = '<div class="px-4 py-4 text-red-600">Could not load website pages.</div>';
+    return [];
+  }
+}
+
+function renderWebsitePageUsage(pages) {
+  const usageElement = document.querySelector("[data-website-pages-usage]");
+  if (!usageElement) return;
+
+  const limit = Number(currentBilling?.entitlement?.websitePageLimit || 0);
+  const used = (pages || []).filter((page) => page.status === "indexed").length;
+
+  if (!limit) {
+    usageElement.textContent = "";
+    usageElement.className = "hidden";
+    return;
+  }
+
+  const remaining = Math.max(0, limit - used);
+  if (used < 25) {
+    usageElement.textContent = "";
+    usageElement.className = "hidden";
+    return;
+  }
+
+  usageElement.textContent = `Website pages: ${used}/${limit}. ${remaining} page(s) left.`;
+  usageElement.className = "mt-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-800";
+}
+
+function renderWebsiteScanResults(pages) {
+  const resultsElement = document.querySelector("[data-website-scan-results]");
+  if (!resultsElement) return;
+
+  if (!pages.length) {
+    resultsElement.classList.add("hidden");
+    resultsElement.innerHTML = "";
+    return;
+  }
+
+  resultsElement.classList.remove("hidden");
+  resultsElement.innerHTML = `
+    <div class="flex flex-col gap-3">
+      <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <p class="text-sm font-bold text-slate-900">Found ${pages.length} public page(s)</p>
+        <button type="button" data-index-website-pages class="rounded-full bg-[#c96f4a] px-5 py-2.5 text-sm font-bold text-white">
+          Add selected pages
+        </button>
+      </div>
+      <div class="grid gap-2">
+        ${pages.map(function (page, index) {
+          return `
+            <label class="flex items-start gap-3 rounded-lg border border-slate-200 bg-white p-3 text-sm">
+              <input type="checkbox" class="mt-1" data-website-page-choice value="${escapeAttr(page.url)}" ${index < 5 ? "checked" : ""}>
+              <span class="min-w-0 flex-1 break-words text-slate-700">${escapeHtml(page.url)}</span>
+            </label>
+          `;
+        }).join("")}
+      </div>
+    </div>
+  `;
 }
 
 async function renderAdminState() {
@@ -747,10 +963,11 @@ function documentStatusLabel(status) {
   return labels[status] || status || "Unknown";
 }
 
-function billingStatusLabel(state) {
+function billingStatusLabel(state, planName) {
+  const activePlanName = planName || "Basic";
   const labels = {
     trial: "Basic not active",
-    active: "Basic active",
+    active: `${activePlanName} active`,
     cancel_requested: "Cancellation scheduled",
     payment_failed: "Payment failed",
     cancelled: "Cancelled"
@@ -759,11 +976,12 @@ function billingStatusLabel(state) {
   return labels[state] || "Basic not active";
 }
 
-function billingAccessLabel(state, accessAllowed) {
-  if (state === "cancel_requested") return "Future billing is cancelled. Basic stays active until the current billing cycle ends.";
-  if (accessAllowed) return "Basic plan limits are active";
-  if (state === "payment_failed") return "Payment failed. Basic features are locked until payment is restored.";
-  if (state === "cancelled") return "Subscription cancelled. Basic features are locked.";
+function billingAccessLabel(state, accessAllowed, planName) {
+  const activePlanName = planName || "Basic";
+  if (state === "cancel_requested") return `Future billing is cancelled. ${activePlanName} stays active until the current billing cycle ends.`;
+  if (accessAllowed) return `${activePlanName} plan limits are active`;
+  if (state === "payment_failed") return `Payment failed. ${activePlanName} features are locked until payment is restored.`;
+  if (state === "cancelled") return "Subscription cancelled. Paid features are locked.";
   return "Start Basic to unlock uploads and chatbot setup.";
 }
 
@@ -774,6 +992,31 @@ function billingButtonLabel(state, checkoutPending) {
   if (state === "payment_failed") return "Retry ₹350/month payment";
   if (state === "cancelled") return "Restart Basic - ₹350/month";
   return "Start Basic - ₹350/month";
+}
+
+function setUpgradeButtonState(button, billing, activePlanKey) {
+  if (!button) return;
+
+  const canUpgrade = Boolean(billing.active) && activePlanKey === "basic" && !billing.checkout_pending;
+  button.classList.toggle("hidden", !canUpgrade);
+  button.textContent = canUpgrade ? "Upgrade to Pro - INR 500/month" : "Pro active";
+  setButtonEnabled(button, canUpgrade);
+}
+
+function planKeyFromBilling(billing) {
+  const planName = String(billing?.plan?.name || billing?.subscription?.plan_name || "").toLowerCase();
+  return planName.includes("pro") ? "pro" : "basic";
+}
+
+function resetCheckoutButton(button) {
+  if (!button) return;
+
+  if ((button.getAttribute("data-subscribe-plan") || "basic") === "pro") {
+    button.textContent = "Upgrade to Pro - INR 500/month";
+    return;
+  }
+
+  button.textContent = "Start Basic - ₹350/month";
 }
 
 function pollDocumentsWhileProcessing() {
@@ -843,10 +1086,12 @@ function renderEmbedScript(account) {
 
 function renderWebsiteUrl(account) {
   const input = document.querySelector("[data-website-url-input]");
+  const crawlInput = document.querySelector("[data-website-crawl-url-input]");
   const statusElement = document.querySelector("[data-website-url-status]");
   if (!input) return;
 
   input.value = account.tenant?.website_url || account.chatbot_settings?.website_url || "";
+  if (crawlInput && !crawlInput.value) crawlInput.value = input.value;
   setText(statusElement, input.value ? "Only this origin can use your chatbot." : "Set this before installing the widget.");
 }
 
@@ -886,13 +1131,13 @@ function openRazorpayCheckout(checkout, subscribeButton) {
         const errorElement = document.querySelector("[data-dashboard-error]");
         setText(errorElement, "Payment signature could not be verified. Please contact support before retrying.");
         setButtonEnabled(subscribeButton, true);
-        if (subscribeButton) subscribeButton.textContent = "Start Basic - ₹350/month";
+        resetCheckoutButton(subscribeButton);
       }
     },
     modal: {
       ondismiss: function () {
         setButtonEnabled(subscribeButton, true);
-        if (subscribeButton) subscribeButton.textContent = "Start Basic - ₹350/month";
+        resetCheckoutButton(subscribeButton);
       }
     }
   });
@@ -915,6 +1160,23 @@ function setDashboardSetupVisible(visible) {
   document.querySelectorAll("[data-billing-setup]").forEach(function (element) {
     element.classList.toggle("hidden", !visible);
   });
+}
+
+function setWebsiteCrawlingEnabled(enabled) {
+  const controls = document.querySelector("[data-website-crawling-controls]");
+  const upgrade = document.querySelector("[data-website-crawling-upgrade]");
+  const status = document.querySelector("[data-website-pages-status]");
+
+  if (controls) {
+    controls.querySelectorAll("input,button").forEach(function (element) {
+      element.disabled = !enabled;
+      element.classList.toggle("opacity-60", !enabled);
+      element.classList.toggle("cursor-not-allowed", !enabled);
+    });
+  }
+
+  if (upgrade) upgrade.classList.toggle("hidden", enabled);
+  if (!enabled) setText(status, "Website crawling is available in Pro Plan.");
 }
 
 function setCancelButtonVisible(button, visible) {

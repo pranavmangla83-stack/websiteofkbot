@@ -60,9 +60,18 @@
         <button
           type="button"
           data-subscribe-basic
+          data-subscribe-plan="basic"
           class="mt-4 rounded-full bg-[#c96f4a] px-5 py-3 text-sm font-bold text-white"
         >
-          Start Basic - ₹350/month
+          Start Basic - ₹1/month
+        </button>
+        <button
+          type="button"
+          data-subscribe-pro
+          data-subscribe-plan="pro"
+          class="mt-4 hidden rounded-full bg-emerald-600 px-5 py-3 text-sm font-bold text-white"
+        >
+          Upgrade to Pro - INR 2/month
         </button>
         <button
           type="button"
@@ -71,16 +80,22 @@
         >
           Cancel future billing
         </button>
+        <a
+          href="mailto:Support@customaichatbot.online?subject=Custom%20AI%20Chatbot%20Support"
+          class="mt-4 inline-flex rounded-full border border-white/20 px-5 py-3 text-sm font-bold text-white"
+        >
+          Contact support
+        </a>
         <p class="mt-3 text-sm text-red-200" data-dashboard-error></p>
       </div>
       <div class="mt-8 grid gap-4 md:grid-cols-3">
         <article class="rounded-2xl bg-[#fff7ef] p-5">
           <h2 class="font-bold">1. Start Basic</h2>
-          <p class="mt-2 text-sm leading-6 text-slate-600">Activate the ₹350/month recurring Basic plan for your chatbot.</p>
+          <p class="mt-2 text-sm leading-6 text-slate-600">Activate the ₹1/month recurring Basic plan for your chatbot.</p>
         </article>
         <article class="rounded-2xl bg-[#f4f8f2] p-5">
           <h2 class="font-bold">2. Upload knowledge</h2>
-          <p class="mt-2 text-sm leading-6 text-slate-600">Upload up to 3 PDFs, maximum 7 MB each. The chatbot will answer questions from those PDFs.</p>
+          <p class="mt-2 text-sm leading-6 text-slate-600">Basic is PDF-only. Pro adds website crawling, 5 PDFs up to 10 MB each, and 700 replies/month.</p>
         </article>
         <article class="rounded-2xl bg-[#eef4f8] p-5">
           <h2 class="font-bold">3. Install chatbot</h2>
@@ -93,7 +108,7 @@
           <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h2 class="text-xl font-bold">PDF knowledge</h2>
-              <p class="mt-1 text-sm text-slate-600">Upload your business PDFs after Basic is active. Basic allows up to 3 PDFs, maximum 7 MB each.</p>
+              <p class="mt-1 text-sm text-slate-600">Upload business PDFs for your chatbot. Basic includes 3 PDFs up to 7 MB each. Pro includes 5 PDFs up to 10 MB each.</p>
             </div>
             <form data-pdf-upload-form class="flex flex-col gap-2 sm:items-end">
               <input
@@ -117,6 +132,42 @@
             </div>
             <div data-documents-list class="divide-y divide-slate-100 text-sm">
               <div class="px-4 py-4 text-slate-500">Loading documents...</div>
+            </div>
+          </div>
+
+          <div class="mt-6 border-t border-slate-200 pt-5">
+            <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h2 class="text-xl font-bold">Website knowledge</h2>
+                <p class="mt-1 text-sm text-slate-600">Available in Pro Plan. Scan public website pages and add selected pages to chatbot knowledge.</p>
+              </div>
+            </div>
+            <div class="mt-4 flex flex-col gap-2 rounded-xl border border-slate-200 bg-slate-50 p-4 sm:flex-row" data-website-crawling-controls>
+              <input
+                type="url"
+                placeholder="https://example.com"
+                class="min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
+                data-website-crawl-url-input
+              >
+              <button type="button" data-scan-website class="rounded-full bg-slate-950 px-5 py-2.5 text-sm font-bold text-white">
+                Scan website
+              </button>
+            </div>
+            <p class="mt-3 hidden rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800" data-website-crawling-upgrade>
+              Website crawling is available in Pro Plan.
+            </p>
+            <p class="mt-3 text-sm font-bold text-slate-700" data-website-pages-usage></p>
+            <p class="mt-3 text-sm text-slate-600" data-website-pages-status></p>
+            <div class="mt-4 hidden rounded-xl border border-slate-200 bg-slate-50 p-4" data-website-scan-results></div>
+            <div class="mt-5 overflow-hidden rounded-xl border border-slate-200">
+              <div class="grid grid-cols-[1fr_110px_80px] gap-3 bg-slate-50 px-4 py-3 text-xs font-bold uppercase tracking-wide text-slate-500">
+                <span>Page</span>
+                <span>Status</span>
+                <span></span>
+              </div>
+              <div data-website-pages-list class="divide-y divide-slate-100 text-sm">
+                <div class="px-4 py-4 text-slate-500">Loading website pages...</div>
+              </div>
             </div>
           </div>
         </section>

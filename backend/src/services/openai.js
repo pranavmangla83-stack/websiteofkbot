@@ -1,7 +1,7 @@
 import OpenAI from "openai";
 import { env, requireEnv } from "../config/env.js";
 
-const FALLBACK_ANSWER = "I don't have that information in the uploaded business documents.";
+const FALLBACK_ANSWER = "I don't have that information in the uploaded business documents or website pages.";
 
 let openai;
 
@@ -34,7 +34,7 @@ export async function createChatAnswer({ question, context }) {
       {
         role: "system",
         content: [
-          "You answer website visitor questions using only the provided PDF context.",
+          "You answer website visitor questions using only the provided business knowledge context.",
           "You may answer brief greetings or courtesy messages naturally.",
           "If the answer is not clearly present in the context, reply exactly:",
           FALLBACK_ANSWER,
@@ -43,7 +43,7 @@ export async function createChatAnswer({ question, context }) {
       },
       {
         role: "user",
-        content: `PDF context:\n${context}\n\nQuestion:\n${question}`
+        content: `Business knowledge context:\n${context}\n\nQuestion:\n${question}`
       }
     ]
   });

@@ -5,7 +5,7 @@ import { assertCanUseChat } from "../services/entitlements.js";
 import { notifyLeadSubmitted } from "../services/email.js";
 import { createChatAnswer, createEmbedding } from "../services/openai.js";
 
-const FALLBACK_ANSWER = "I don't have that information in the uploaded business documents.";
+const FALLBACK_ANSWER = "I don't have that information in the uploaded business documents or website pages.";
 const FALLBACK_PUBLIC_ANSWER = FALLBACK_ANSWER;
 const MIN_SIMILARITY = 0.32;
 
@@ -76,7 +76,12 @@ chatRouter.post("/", chatLimiter, async (req, res, next) => {
       embedding: messageEmbedding
     });
 
-    const context = chunks.map((chunk, index) => `Source ${index + 1}:\n${chunk.chunk_text}`).join("\n\n");
+    const context = chunks.map((chunk, index) => {
+      const label = chunk.metadata?.url
+        ? `Source ${index + 1} (${chunk.metadata.url})`
+        : `Source ${index + 1}`;
+      return `${label}:\n${chunk.chunk_text}`;
+    }).join("\n\n");
     const answerResult = context
       ? await createChatAnswer({ question: message, context })
       : { answer: FALLBACK_ANSWER, tokenUsage: 0 };
@@ -101,6 +106,8 @@ chatRouter.post("/", chatLimiter, async (req, res, next) => {
       sources: chunks.map((chunk) => ({
         id: chunk.id,
         document_id: chunk.document_id,
+        source_type: chunk.source_type || chunk.metadata?.source_type || null,
+        url: chunk.metadata?.url || null,
         similarity: Number(chunk.similarity)
       }))
     });
@@ -220,7 +227,7 @@ async function getPublicChatbot({ clientId, chatbotKey }) {
 async function searchClientChunks({ clientId, chatbotId, embedding }) {
   const result = await query(
     `
-      SELECT id, document_id, chunk_text, metadata, similarity
+      SELECT id, document_id, chunk_text, metadata, metadata->>'source_type' AS source_type, similarity
       FROM match_document_chunks($3::vector, $1::uuid, $2::uuid, 6, $4::double precision)
     `,
     [clientId, chatbotId, vectorToSql(embedding), MIN_SIMILARITY]
@@ -354,7 +361,7 @@ function getBasicAnswer(message) {
   const normalized = normalizeText(message, 80).toLowerCase();
 
   if (/^(hi|hello|hey|namaste|good morning|good afternoon|good evening)\b[!. ]*$/.test(normalized)) {
-    return "Hi! Ask me anything about the uploaded business documents.";
+    return "Hi!";
   }
 
   if (/^(thanks|thank you|ok|okay)\b[!. ]*$/.test(normalized)) {

@@ -13,7 +13,7 @@
   <title>AI Chatbot for Your Website Trained on Business Documents</title>
   <meta
     name="description"
-    content="Custom AI Chatbot helps Indian small businesses answer website visitors 24/7 using uploaded PDFs and business documents. Basic plan at ₹350/month."
+    content="Custom AI Chatbot helps Indian small businesses answer website visitors 24/7 using uploaded PDFs and business documents. Basic plan at ₹1/month."
   >
   <meta name="keywords" content="AI chatbot for website, business document chatbot, website chatbot India, chatbot from PDF, small business chatbot">
   <meta name="author" content="Custom AI Chatbot">
@@ -96,10 +96,10 @@
       "applicationCategory": "BusinessApplication",
       "operatingSystem": "Web",
       "offers": {
-        "@type": "Offer",
-        "price": "350",
-        "priceCurrency": "INR",
-        "billingDuration": "P1M"
+        "@type": "AggregateOffer",
+        "lowPrice": "1",
+        "highPrice": "2",
+        "priceCurrency": "INR"
       },
       "areaServed": "India",
       "url": "https://customaichatbot.online/"
@@ -141,7 +141,7 @@
           class="rounded-lg bg-brand px-4 py-2 font-bold text-white hover:bg-brandDeep"
           data-auth-guest
         >
-          Start at ₹350/month
+          Start Basic
         </a>
         <a data-auth-user href="/dashboard.html" class="hidden rounded-lg bg-ink px-4 py-2 font-bold text-white">Dashboard</a>
       </nav>
@@ -153,7 +153,7 @@
       <div class="mx-auto grid max-w-6xl gap-10 px-5 py-12 md:grid-cols-[1.02fr_0.98fr] md:items-center md:px-8 md:py-16">
         <div>
           <p class="inline-flex rounded-lg bg-[#f6ede5] px-3 py-2 text-sm font-bold text-brandDeep">
-            Basic plan ₹350/month
+            Basic plan ₹1/month
           </p>
           <h1 class="mt-5 text-4xl font-bold leading-tight text-ink md:text-6xl">
             AI Chatbot for Your Website Trained on Your Business Documents
@@ -161,25 +161,19 @@
           <p class="mt-5 max-w-2xl text-lg leading-8 text-ink/70">
             Upload your PDFs, FAQs, menu, brochure, or service details. Your website chatbot answers customers 24/7, reduces repeated calls, and collects leads when visitors need help.
           </p>
-          <div class="mt-7 flex flex-col gap-3 sm:flex-row">
+          <div class="mt-7 flex">
             <a
               id="hero-trial-btn"
               href="/dashboard.html"
               data-kinde-register
               data-redirect-to="/dashboard.html"
-              class="rounded-lg bg-brand px-6 py-3 text-center text-sm font-bold text-white shadow-soft hover:bg-brandDeep"
+              class="rounded-xl bg-brand px-8 py-4 text-center text-lg font-bold text-white shadow-soft ring-4 ring-brand/15 hover:bg-brandDeep"
             >
-              Start at ₹350/month
-            </a>
-            <a
-              href="#contact"
-              class="rounded-lg border border-line bg-white px-6 py-3 text-center text-sm font-bold text-ink hover:border-brand"
-            >
-              Contact Us
+              Start at &#8377;1/month
             </a>
           </div>
           <p class="mt-4 max-w-2xl text-sm leading-6 text-ink/70">
-            Basic includes 1 website chatbot and up to 3 PDF uploads. Each PDF can be maximum 7 MB, and the chatbot answers questions from the PDFs you upload.
+            Basic includes 1 website chatbot and up to 3 PDF uploads. Each PDF can be maximum 7 MB. Website crawling is not included in Basic Plan.
           </p>
           <div class="mt-7 grid gap-3 text-sm text-ink/70 sm:grid-cols-3">
             <p class="rounded-lg border border-line bg-paper p-3">No coding needed for dashboard use</p>
@@ -213,6 +207,77 @@
           <div class="rounded-lg border border-white/10 bg-white/5 p-4 text-sm text-white/70">
             If the chatbot does not know an answer, it does not guess. It asks for contact details or points visitors to support.
           </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="pricing" class="border-y border-line bg-white">
+      <div class="mx-auto max-w-6xl px-5 py-12 md:px-8 md:py-16">
+        <div class="max-w-2xl">
+          <a
+            href="#pricing"
+            class="inline-flex rounded-xl bg-brand px-8 py-4 text-lg font-bold text-white shadow-soft ring-4 ring-brand/15 hover:bg-brandDeep"
+          >
+            Pricing
+          </a>
+          <h2 class="mt-2 text-3xl font-bold md:text-4xl">Simple monthly pricing</h2>
+          <p class="mt-4 leading-8 text-ink/70">Choose PDF-only setup or upgrade to Pro when you want the chatbot to learn from website pages too.</p>
+        </div>
+        <div class="mt-8 grid gap-5 lg:grid-cols-2">
+        <div class="rounded-xl border-2 border-line bg-paper p-6 shadow-soft">
+          <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <p class="text-sm font-bold uppercase tracking-wide text-brandDeep">Basic</p>
+              <a
+                id="pricing-trial-btn"
+                href="/dashboard.html"
+                data-kinde-register
+                data-redirect-to="/dashboard.html"
+                data-track-pay="basic"
+                class="mt-2 inline-flex rounded-xl bg-brand px-7 py-4 text-4xl font-bold text-white shadow-soft ring-4 ring-brand/15 hover:bg-brandDeep"
+              >
+                &#8377;1<span class="ml-1 self-end pb-1 text-base font-medium text-white/80">/month</span>
+              </a>
+              <p class="mt-3 leading-7 text-ink/70">Best for PDF-based chatbot setup. Upload your business PDFs and let the chatbot answer from those files.</p>
+            </div>
+          </div>
+          <ul class="mt-6 grid gap-3 text-sm leading-6 text-ink/75 sm:grid-cols-2">
+            <li class="rounded-lg bg-white p-3">1 chatbot</li>
+            <li class="rounded-lg bg-white p-3">Up to 3 PDFs</li>
+            <li class="rounded-lg bg-white p-3">Each PDF up to 7 MB</li>
+            <li class="rounded-lg bg-white p-3">Answers from uploaded PDFs</li>
+            <li class="rounded-lg bg-white p-3">400 chatbot replies/month</li>
+            <li class="rounded-lg bg-white p-3 font-bold text-red-700">Website crawling is not included in Basic Plan.</li>
+            <li class="rounded-lg bg-white p-3">Basic starts after payment</li>
+            <li class="rounded-lg bg-white p-3">Cancel future billing from dashboard</li>
+          </ul>
+        </div>
+        <div class="rounded-xl border-2 border-brand bg-white p-6 shadow-soft">
+          <p class="text-sm font-bold uppercase tracking-wide text-brandDeep">Pro</p>
+          <a
+            href="/dashboard.html"
+            data-kinde-register
+            data-redirect-to="/dashboard.html"
+            data-track-pay="pro"
+            class="mt-2 inline-flex rounded-xl bg-ink px-7 py-4 text-4xl font-bold text-white shadow-soft ring-4 ring-ink/10 hover:bg-brandDeep"
+          >
+            &#8377;2<span class="ml-1 self-end pb-1 text-base font-medium text-white/80">/month</span>
+          </a>
+          <h3 class="mt-4 text-xl font-bold">Website crawling included</h3>
+          <p class="mt-3 leading-7 text-ink/70">Best when you want the chatbot to learn from your public website pages along with PDFs.</p>
+          <p class="mt-3 rounded-lg border border-line bg-paper p-3 text-sm leading-6 text-ink/75">
+            Before buying Pro: website crawling needs pages that are public and readable by our system. Protected sites can still use PDFs or pasted text.
+            <a href="#website-crawling-note" class="font-bold text-brandDeep hover:underline">Learn more</a>.
+          </p>
+          <ul class="mt-6 grid gap-3 text-sm leading-6 text-ink/75 sm:grid-cols-2">
+            <li class="rounded-lg bg-paper p-3 font-bold text-brandDeep">Website crawling</li>
+            <li class="rounded-lg bg-paper p-3">Up to 5 PDFs</li>
+            <li class="rounded-lg bg-paper p-3">Each PDF up to 10 MB</li>
+            <li class="rounded-lg bg-paper p-3">700 chatbot replies/month</li>
+            <li class="rounded-lg bg-paper p-3">Answers from website pages and PDFs</li>
+            <li class="rounded-lg bg-paper p-3">Good for services, FAQs, pricing, and contact info</li>
+          </ul>
+        </div>
         </div>
       </div>
     </section>
@@ -268,45 +333,6 @@
       </div>
     </section>
 
-    <section id="pricing" class="border-y border-line bg-white">
-      <div class="mx-auto max-w-6xl px-5 py-12 md:px-8 md:py-16">
-        <div class="max-w-2xl">
-          <p class="text-sm font-bold uppercase tracking-wide text-brandDeep">Pricing</p>
-          <h2 class="mt-2 text-3xl font-bold md:text-4xl">Simple monthly pricing</h2>
-          <p class="mt-4 leading-8 text-ink/70">Start with the Basic plan for one small business website chatbot.</p>
-        </div>
-        <div class="mt-8 max-w-xl rounded-xl border-2 border-brand bg-paper p-6 shadow-soft">
-          <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-            <div>
-              <p class="text-sm font-bold uppercase tracking-wide text-brandDeep">Basic</p>
-              <p class="mt-2 text-4xl font-bold">₹350<span class="text-base font-medium text-ink/60">/month</span></p>
-              <p class="mt-3 leading-7 text-ink/70">Basic includes 1 website chatbot and up to 3 PDF uploads. Each PDF can be maximum 7 MB, and the chatbot answers questions from the PDFs you upload.</p>
-            </div>
-            <a
-              id="pricing-trial-btn"
-              href="/dashboard.html"
-              data-kinde-register
-              data-redirect-to="/dashboard.html"
-              data-track-pay="basic"
-              class="rounded-lg bg-brand px-5 py-3 text-center text-sm font-bold text-white hover:bg-brandDeep"
-            >
-              Start at ₹350/month
-            </a>
-          </div>
-          <ul class="mt-6 grid gap-3 text-sm leading-6 text-ink/75 sm:grid-cols-2">
-            <li class="rounded-lg bg-white p-3">1 chatbot</li>
-            <li class="rounded-lg bg-white p-3">Upload up to 3 PDFs on Basic</li>
-            <li class="rounded-lg bg-white p-3">Each PDF can be up to 7 MB</li>
-            <li class="rounded-lg bg-white p-3">Answers come from your uploaded PDFs</li>
-            <li class="rounded-lg bg-white p-3">400 messages/month on Basic</li>
-            <li class="rounded-lg bg-white p-3">1,000,000 tokens/month on Basic</li>
-            <li class="rounded-lg bg-white p-3">Basic starts after payment</li>
-            <li class="rounded-lg bg-white p-3">Cancel future billing from dashboard</li>
-          </ul>
-        </div>
-      </div>
-    </section>
-
     <section class="mx-auto max-w-6xl px-5 py-12 md:px-8 md:py-16">
       <div class="grid gap-8 md:grid-cols-[0.8fr_1.2fr]">
         <div>
@@ -337,6 +363,12 @@
           <h2 class="mt-2 text-3xl font-bold md:text-4xl">Common questions</h2>
         </div>
         <div class="mt-8 grid gap-4 md:grid-cols-2">
+          <details id="website-crawling-note" class="rounded-lg border border-line bg-paper p-5">
+            <summary class="cursor-pointer font-bold">What if my website cannot be crawled?</summary>
+            <p class="mt-3 leading-7 text-ink/70">Website crawling reads public pages from your website and adds that information to your chatbot. It works best when your pages are public and contain normal readable text.</p>
+            <p class="mt-3 leading-7 text-ink/70">Sometimes a website may block automatic reading because of website security tools, login protection, Cloudflare checks, CAPTCHA, or robots.txt rules.</p>
+            <p class="mt-3 leading-7 text-ink/70">If this happens, you can still train the chatbot by uploading PDFs or pasting FAQ and business text manually. We do not bypass website security; we only read pages that are public and allowed to be read.</p>
+          </details>
           <details class="rounded-lg border border-line bg-paper p-5" open>
             <summary class="cursor-pointer font-bold">Do I need coding?</summary>
             <p class="mt-3 leading-7 text-ink/70">You do not need coding to upload documents or manage the chatbot. To install it, paste one script into your website. Your web developer can do this quickly if needed.</p>
@@ -355,7 +387,7 @@
           </details>
           <details class="rounded-lg border border-line bg-paper p-5 md:col-span-2">
             <summary class="cursor-pointer font-bold">Is payment monthly?</summary>
-            <p class="mt-3 leading-7 text-ink/70">Yes. The Basic plan is ₹350 per month as a recurring subscription.</p>
+            <p class="mt-3 leading-7 text-ink/70">Yes. The Basic plan is ₹1 per month as a recurring subscription.</p>
           </details>
         </div>
       </div>
@@ -375,7 +407,7 @@
           data-redirect-to="/dashboard.html"
           class="mt-6 inline-flex rounded-lg bg-brand px-6 py-3 text-sm font-bold text-white hover:bg-brandDeep md:mt-0"
         >
-          Get Your Chatbot - ₹350/month
+          Get Your Chatbot - ₹1/month
         </a>
       </div>
     </section>

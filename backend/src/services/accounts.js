@@ -73,7 +73,15 @@ export async function getClientSubscription(db, clientId) {
       SELECT *
       FROM subscriptions
       WHERE client_id = $1
-      ORDER BY created_at DESC
+      ORDER BY
+        CASE
+          WHEN lower(status) IN ('active', 'cancel_requested') THEN 0
+          WHEN lower(status) = 'authenticated' THEN 1
+          WHEN lower(status) = 'created' THEN 2
+          ELSE 3
+        END,
+        CASE WHEN lower(plan_name) LIKE '%pro%' THEN 0 ELSE 1 END,
+        created_at DESC
       LIMIT 1
     `,
     [clientId]

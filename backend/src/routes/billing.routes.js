@@ -3,64 +3,81 @@ import { env, requireEnv } from "../config/env.js";
 import { query, withTransaction } from "../db/pool.js";
 import { requireAuth } from "../middleware/auth.js";
 import { getCurrentAccount, isSubscriptionActive, syncUserAndTenant } from "../services/accounts.js";
+import { getClientEntitlement } from "../services/entitlements.js";
 import { getRazorpay, verifySubscriptionCheckoutSignature, verifyWebhookSignature } from "../services/razorpay.js";
 
 export const billingRouter = express.Router();
 
 const RAZORPAY_PAISE_PER_RUPEE = 100;
 const RAZORPAY_EXPECTED_CURRENCY = "INR";
+const PLAN_ENV_KEYS = {
+  basic: "razorpayBasicPlanId",
+  pro: "razorpayProPlanId"
+};
 
 billingRouter.post("/create-subscription", requireAuth, async (req, res, next) => {
   try {
-    requireEnv(["razorpayKeyId", "razorpayKeySecret", "razorpayWebhookSecret", "razorpayBasicPlanId"]);
+    const planKey = requestedPlanKey(req.body?.plan || req.body?.plan_name || "basic");
+    const planEnvKey = PLAN_ENV_KEYS[planKey];
+    requireEnv(["razorpayKeyId", "razorpayKeySecret", "razorpayWebhookSecret", planEnvKey]);
 
     const account = await syncUserAndTenant(req.auth);
 
     const plan = (await query(
       "SELECT * FROM plans WHERE name = $1 AND is_active = true LIMIT 1",
-      ["basic"]
+      [planKey]
     )).rows[0];
 
     if (!plan) {
-      return res.status(500).json({ error: "Basic plan is not seeded in the database" });
+      return res.status(500).json({ error: `${planDisplayName(planKey)} plan is not seeded in the database` });
     }
 
-    await assertRazorpayPlanMatchesLocalPlan(plan);
+    await assertRazorpayPlanMatchesLocalPlan(plan, planEnvKey);
 
     const checkout = await withTransaction(async (db) => {
       await db.query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))", [`billing:${account.client.id}`]);
 
+      const activeSubscription = await getActiveClientSubscription(db, account.client.id);
       const latestSubscription = await getLatestClientSubscription(db, account.client.id);
-      const lockedAccount = { ...account, subscription: latestSubscription };
+      const latestPlanSubscription = await getLatestClientPlanSubscription(db, account.client.id, plan.display_name);
+      const reusableSubscription = latestPlanSubscription || latestSubscription;
+      const lockedAccount = { ...account, subscription: activeSubscription || latestSubscription };
 
-      if (isSubscriptionActive(latestSubscription)) {
+      if (isSubscriptionActive(activeSubscription) && planKeyForSubscription(activeSubscription) === planKey) {
         return {
           status: 409,
-          body: { error: "Basic subscription is already active." }
+          body: { error: `${plan.display_name} subscription is already active.` }
         };
       }
 
-      if (isAwaitingWebhookActivation(latestSubscription)) {
+      if (planKey === "basic" && isSubscriptionActive(activeSubscription) && planKeyForSubscription(activeSubscription) === "pro") {
         return {
           status: 409,
-          body: { error: "Payment is verified. Your Basic plan is being activated. Please refresh in a minute." }
+          body: { error: "Pro subscription is already active." }
         };
       }
 
-      if (await isReusableCheckoutSubscription(latestSubscription)) {
+      if (isAwaitingWebhookActivation(latestPlanSubscription)) {
+        return {
+          status: 409,
+          body: { error: `Payment is verified. Your ${plan.display_name} plan is being activated. Please refresh in a minute.` }
+        };
+      }
+
+      if (await isReusableCheckoutSubscription(reusableSubscription, planEnvKey)) {
         return {
           status: 200,
           body: subscriptionCheckoutResponse({
             account: lockedAccount,
             plan,
-            subscriptionId: latestSubscription.razorpay_subscription_id,
-            subscriptionStatus: latestSubscription.status
+            subscriptionId: reusableSubscription.razorpay_subscription_id,
+            subscriptionStatus: reusableSubscription.status
           })
         };
       }
 
       const subscription = await getRazorpay().subscriptions.create({
-        plan_id: env.razorpayBasicPlanId,
+        plan_id: env[planEnvKey],
         total_count: 120,
         quantity: 1,
         customer_notify: 1,
@@ -165,6 +182,12 @@ billingRouter.post("/verify-checkout", requireAuth, async (req, res, next) => {
       [subscription.id]
     );
 
+    if (planKeyForSubscription(subscription) === "pro") {
+      await cancelOtherActiveSubscriptionsForUpgrade(account.client.id, subscription.id).catch((error) => {
+        console.error("Failed to schedule old subscription cancellation after Pro upgrade:", error);
+      });
+    }
+
     res.json({
       verified: true,
       subscription_id: razorpaySubscriptionId,
@@ -185,11 +208,14 @@ billingRouter.get("/status", requireAuth, async (req, res, next) => {
       });
     }
 
+    const entitlement = await getClientEntitlement({ query }, account);
+
     res.json({
       active: isSubscriptionActive(account.subscription),
       payment_state: paymentStateForSubscription(account.subscription),
       checkout_pending: isAwaitingWebhookActivation(account.subscription),
       dashboard_access_allowed: account.dashboard_access_allowed,
+      entitlement,
       plan: account.subscription ? await planForSubscription(account.subscription.plan_name) : null,
       subscription: account.subscription
     });
@@ -424,12 +450,42 @@ async function getLatestClientSubscription(db, clientId) {
   )).rows[0] || null;
 }
 
-async function isReusableCheckoutSubscription(subscription) {
+async function getLatestClientPlanSubscription(db, clientId, planName) {
+  return (await db.query(
+    `
+      SELECT *
+      FROM subscriptions
+      WHERE client_id = $1
+        AND lower(plan_name) = lower($2)
+      ORDER BY created_at DESC
+      LIMIT 1
+    `,
+    [clientId, planName]
+  )).rows[0] || null;
+}
+
+async function getActiveClientSubscription(db, clientId) {
+  return (await db.query(
+    `
+      SELECT *
+      FROM subscriptions
+      WHERE client_id = $1
+        AND lower(status) IN ('active', 'cancel_requested')
+      ORDER BY
+        CASE WHEN lower(plan_name) LIKE '%pro%' THEN 0 ELSE 1 END,
+        created_at DESC
+      LIMIT 1
+    `,
+    [clientId]
+  )).rows[0] || null;
+}
+
+async function isReusableCheckoutSubscription(subscription, planEnvKey) {
   if (!subscription?.razorpay_subscription_id) return false;
   if (String(subscription.status || "").toLowerCase() !== "created") return false;
 
   const razorpaySubscription = await getRazorpay().subscriptions.fetch(subscription.razorpay_subscription_id);
-  return razorpaySubscription.plan_id === env.razorpayBasicPlanId
+  return razorpaySubscription.plan_id === env[planEnvKey]
     && String(razorpaySubscription.status || "").toLowerCase() === "created";
 }
 
@@ -453,12 +509,60 @@ function subscriptionCheckoutResponse({ account, plan, subscriptionId, subscript
       key: env.razorpayKeyId,
       subscription_id: subscriptionId,
       name: "Custom AI Chatbot",
-      description: "Basic monthly plan",
+      description: `${plan.display_name} monthly plan`,
       prefill: {
         email: account.user.email || ""
       }
     }
   };
+}
+
+async function cancelOtherActiveSubscriptionsForUpgrade(clientId, upgradedSubscriptionId) {
+  const activeSubscriptions = (await query(
+    `
+      SELECT *
+      FROM subscriptions
+      WHERE client_id = $1
+        AND id <> $2
+        AND lower(status) IN ('active', 'authenticated', 'cancel_requested')
+        AND razorpay_subscription_id IS NOT NULL
+    `,
+    [clientId, upgradedSubscriptionId]
+  )).rows;
+
+  await Promise.all(activeSubscriptions.map(async (subscription) => {
+    if (String(subscription.status || "").toLowerCase() !== "cancel_requested") {
+      await getRazorpay().subscriptions.cancel(subscription.razorpay_subscription_id, true);
+    }
+
+    await query(
+      `
+        UPDATE subscriptions
+        SET status = 'cancel_requested',
+            updated_at = now()
+        WHERE id = $1
+      `,
+      [subscription.id]
+    );
+  }));
+}
+
+function requestedPlanKey(planName) {
+  const normalized = String(planName || "").trim().toLowerCase();
+  if (normalized === "pro") return "pro";
+  if (normalized === "basic") return "basic";
+
+  const error = new Error("Unsupported plan. Choose Basic or Pro.");
+  error.statusCode = 400;
+  throw error;
+}
+
+function planKeyForSubscription(subscription) {
+  return String(subscription?.plan_name || "").toLowerCase().includes("pro") ? "pro" : "basic";
+}
+
+function planDisplayName(planKey) {
+  return planKey === "pro" ? "Pro" : "Basic";
 }
 
 async function verifyCheckoutWithRazorpayApi({ razorpayPaymentId, razorpaySubscriptionId }) {
@@ -471,12 +575,12 @@ async function verifyCheckoutWithRazorpayApi({ razorpayPaymentId, razorpaySubscr
 
   return payment?.subscription_id === razorpaySubscriptionId
     && subscription?.id === razorpaySubscriptionId
-    && subscription?.plan_id === env.razorpayBasicPlanId
+    && [env.razorpayBasicPlanId, env.razorpayProPlanId].filter(Boolean).includes(subscription?.plan_id)
     && ["authorized", "captured"].includes(String(payment?.status || "").toLowerCase());
 }
 
-async function assertRazorpayPlanMatchesLocalPlan(plan) {
-  const razorpayPlan = await getRazorpay().plans.fetch(env.razorpayBasicPlanId);
+async function assertRazorpayPlanMatchesLocalPlan(plan, planEnvKey) {
+  const razorpayPlan = await getRazorpay().plans.fetch(env[planEnvKey]);
   const expectedAmount = Number(plan.price_inr) * RAZORPAY_PAISE_PER_RUPEE;
   const actualAmount = Number(razorpayPlan.item?.amount);
   const actualCurrency = String(razorpayPlan.item?.currency || "").toUpperCase();
@@ -491,7 +595,7 @@ async function assertRazorpayPlanMatchesLocalPlan(plan) {
     || actualInterval !== 1
   ) {
     throw new Error(
-      `Razorpay Basic plan mismatch. Expected ${RAZORPAY_EXPECTED_CURRENCY} ${plan.price_inr}/${expectedPeriod}; ` +
+      `Razorpay ${plan.display_name} plan mismatch. Expected ${RAZORPAY_EXPECTED_CURRENCY} ${plan.price_inr}/${expectedPeriod}; ` +
       `configured plan is ${actualCurrency || "UNKNOWN"} ${Number.isFinite(actualAmount) ? actualAmount / RAZORPAY_PAISE_PER_RUPEE : "UNKNOWN"}/${actualPeriod || "UNKNOWN"}.`
     );
   }

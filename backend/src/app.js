@@ -16,6 +16,7 @@ import { meRouter } from "./routes/me.routes.js";
 import { scriptRouter } from "./routes/script.routes.js";
 import { testDbRouter } from "./routes/test-db.routes.js";
 import { widgetRouter } from "./routes/widget.routes.js";
+import { websitePagesRouter } from "./routes/website-pages.routes.js";
 
 export const app = express();
 const __filename = fileURLToPath(import.meta.url);
@@ -71,6 +72,7 @@ app.use("/api/me", adminCors, meRouter);
 app.use("/api/admin", adminCors, adminRouter);
 app.use("/api/billing", adminCors, billingRouter);
 app.use("/api/documents", adminCors, documentsRouter);
+app.use("/api/website-pages", adminCors, websitePagesRouter);
 app.use("/api/chat", publicCors, chatRouter);
 app.use("/api", adminCors, scriptRouter);
 app.use("/api/db", adminCors, requireAuth, requireAdmin, testDbRouter);

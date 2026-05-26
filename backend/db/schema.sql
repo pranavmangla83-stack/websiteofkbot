@@ -91,7 +91,7 @@ CREATE TABLE IF NOT EXISTS public.chatbots (
     'primaryColor', '#0f1720',
     'accentColor', '#c96f4a',
     'position', 'bottom-right',
-    'welcomeMessage', 'Hi! How can I help you today?',
+    'welcomeMessage', 'Hi!',
     'fallbackMessage', 'I do not have that information yet. Please contact the business directly.'
   ),
   public_embed_key text NOT NULL UNIQUE DEFAULT encode(gen_random_bytes(18), 'hex'),
@@ -171,7 +171,7 @@ ALTER TABLE public.documents ADD CONSTRAINT documents_status_check
 
 CREATE TABLE IF NOT EXISTS public.document_chunks (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  document_id uuid NOT NULL REFERENCES public.documents(id) ON DELETE CASCADE,
+  document_id uuid REFERENCES public.documents(id) ON DELETE CASCADE,
   user_id uuid NOT NULL REFERENCES public.clients(id) ON DELETE CASCADE,
   client_id uuid NOT NULL REFERENCES public.clients(id) ON DELETE CASCADE,
   chatbot_id uuid NOT NULL REFERENCES public.chatbots(id) ON DELETE CASCADE,
@@ -180,7 +180,7 @@ CREATE TABLE IF NOT EXISTS public.document_chunks (
   embedding vector(1536),
   token_count integer DEFAULT 0 CHECK (token_count >= 0),
   page_number integer CHECK (page_number IS NULL OR page_number >= 1),
-  source_type text CHECK (source_type IN ('pdf_text', 'ocr')),
+  source_type text CHECK (source_type IN ('pdf_text', 'ocr', 'website')),
   ocr_confidence numeric,
   metadata jsonb NOT NULL DEFAULT '{}'::jsonb,
   created_at timestamptz NOT NULL DEFAULT now(),
@@ -189,9 +189,29 @@ CREATE TABLE IF NOT EXISTS public.document_chunks (
 
 ALTER TABLE public.document_chunks ADD COLUMN IF NOT EXISTS user_id uuid REFERENCES public.clients(id) ON DELETE CASCADE;
 ALTER TABLE public.document_chunks ADD COLUMN IF NOT EXISTS page_number integer CHECK (page_number IS NULL OR page_number >= 1);
-ALTER TABLE public.document_chunks ADD COLUMN IF NOT EXISTS source_type text CHECK (source_type IN ('pdf_text', 'ocr'));
+ALTER TABLE public.document_chunks DROP CONSTRAINT IF EXISTS document_chunks_source_type_check;
+ALTER TABLE public.document_chunks ADD COLUMN IF NOT EXISTS source_type text;
+ALTER TABLE public.document_chunks ADD CONSTRAINT document_chunks_source_type_check CHECK (source_type IN ('pdf_text', 'ocr', 'website'));
 ALTER TABLE public.document_chunks ADD COLUMN IF NOT EXISTS ocr_confidence numeric;
 ALTER TABLE public.document_chunks ADD COLUMN IF NOT EXISTS metadata jsonb NOT NULL DEFAULT '{}'::jsonb;
+ALTER TABLE public.document_chunks ALTER COLUMN document_id DROP NOT NULL;
+
+CREATE TABLE IF NOT EXISTS public.website_pages (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL REFERENCES public.clients(id) ON DELETE CASCADE,
+  client_id uuid NOT NULL REFERENCES public.clients(id) ON DELETE CASCADE,
+  chatbot_id uuid NOT NULL REFERENCES public.chatbots(id) ON DELETE CASCADE,
+  url text NOT NULL,
+  title text,
+  status text NOT NULL DEFAULT 'indexed'
+    CHECK (status IN ('indexed', 'failed')),
+  error_message text,
+  content_hash text,
+  indexed_at timestamptz,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (client_id, chatbot_id, url)
+);
 
 CREATE TABLE IF NOT EXISTS public.chat_sessions (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -253,6 +273,8 @@ CREATE INDEX IF NOT EXISTS documents_client_chatbot_idx ON public.documents(clie
 CREATE INDEX IF NOT EXISTS documents_status_idx ON public.documents(status);
 CREATE INDEX IF NOT EXISTS document_chunks_client_chatbot_idx ON public.document_chunks(client_id, chatbot_id);
 CREATE INDEX IF NOT EXISTS document_chunks_document_id_idx ON public.document_chunks(document_id);
+CREATE INDEX IF NOT EXISTS website_pages_client_chatbot_idx ON public.website_pages(client_id, chatbot_id);
+CREATE INDEX IF NOT EXISTS website_pages_status_idx ON public.website_pages(status);
 CREATE INDEX IF NOT EXISTS document_chunks_embedding_hnsw_idx
   ON public.document_chunks USING hnsw (embedding vector_cosine_ops);
 CREATE INDEX IF NOT EXISTS chat_sessions_chatbot_id_idx ON public.chat_sessions(chatbot_id);
@@ -284,6 +306,11 @@ FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 DROP TRIGGER IF EXISTS documents_set_updated_at ON public.documents;
 CREATE TRIGGER documents_set_updated_at
 BEFORE UPDATE ON public.documents
+FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+DROP TRIGGER IF EXISTS website_pages_set_updated_at ON public.website_pages;
+CREATE TRIGGER website_pages_set_updated_at
+BEFORE UPDATE ON public.website_pages
 FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 
 DROP TRIGGER IF EXISTS usage_tracking_set_updated_at ON public.usage_tracking;
@@ -329,7 +356,7 @@ BEGIN
       'client-pdfs',
       'client-pdfs',
       false,
-      7340032,
+      10485760,
       ARRAY['application/pdf']
     )
     ON CONFLICT (id) DO UPDATE SET
@@ -346,6 +373,7 @@ ALTER TABLE public.payments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.chatbots ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.documents ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.document_chunks ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.website_pages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.chat_sessions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.messages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.chat_leads ENABLE ROW LEVEL SECURITY;
@@ -388,6 +416,12 @@ WITH CHECK (client_id IN (SELECT id FROM public.clients WHERE kinde_user_id = pu
 
 DROP POLICY IF EXISTS document_chunks_own_rows ON public.document_chunks;
 CREATE POLICY document_chunks_own_rows ON public.document_chunks
+FOR ALL
+USING (client_id IN (SELECT id FROM public.clients WHERE kinde_user_id = public.current_kinde_user_id()))
+WITH CHECK (client_id IN (SELECT id FROM public.clients WHERE kinde_user_id = public.current_kinde_user_id()));
+
+DROP POLICY IF EXISTS website_pages_own_rows ON public.website_pages;
+CREATE POLICY website_pages_own_rows ON public.website_pages
 FOR ALL
 USING (client_id IN (SELECT id FROM public.clients WHERE kinde_user_id = public.current_kinde_user_id()))
 WITH CHECK (client_id IN (SELECT id FROM public.clients WHERE kinde_user_id = public.current_kinde_user_id()));

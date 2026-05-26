@@ -13,7 +13,7 @@
   var position = script.getAttribute("data-position") === "left" ? "left" : "right";
   var title = clean(script.getAttribute("data-title"), 80) || "AI Assistant";
   var primaryColor = normalizeColor(script.getAttribute("data-primary-color")) || "#2563eb";
-  var welcomeMessage = clean(script.getAttribute("data-welcome-message"), 220) || "Hi! How can I help you today?";
+  var welcomeMessage = clean(script.getAttribute("data-welcome-message"), 220) || "Hi!";
   var storagePrefix = "caic:" + clientId + ":";
   var sessionId = getOrCreateSession(storagePrefix + "session_id");
   var historyKey = storagePrefix + "history";
