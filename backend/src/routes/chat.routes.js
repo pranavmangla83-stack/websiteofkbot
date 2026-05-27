@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import express from "express";
+import { env } from "../config/env.js";
 import { query, withTransaction } from "../db/pool.js";
 import { assertCanUseChat } from "../services/entitlements.js";
 import { notifyLeadSubmitted } from "../services/email.js";
@@ -419,7 +420,11 @@ function isOriginAllowed(origin, websiteUrl) {
   if (!websiteUrl || !origin) return false;
 
   try {
-    return new URL(origin).origin === new URL(websiteUrl).origin;
+    const requestOrigin = new URL(origin).origin;
+    const allowedOrigin = new URL(websiteUrl).origin;
+    const dashboardOrigin = env.frontendUrl ? new URL(env.frontendUrl).origin : "";
+
+    return requestOrigin === allowedOrigin || requestOrigin === dashboardOrigin;
   } catch (_error) {
     return false;
   }
