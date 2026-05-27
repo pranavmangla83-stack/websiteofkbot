@@ -29,7 +29,8 @@
     "pdfjs-dist": "^5.7.284",
     "pg": "^8.20.0",
     "razorpay": "^2.9.6",
-    "tesseract.js": "^7.0.0"
+    "tesseract.js": "^7.0.0",
+    "ws": "^8.21.0"
   },
   "devDependencies": {
     "pdfkit": "^0.18.0"
