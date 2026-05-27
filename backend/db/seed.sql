@@ -10,8 +10,8 @@ INSERT INTO public.plans (
   is_active
 )
 VALUES
-  ('basic', 'Basic', 1, 'monthly', 1, 3, 400, 1000000, true),
-  ('pro', 'Pro', 2, 'monthly', 1, 5, 700, 1500000, true)
+  ('basic', 'Basic', 350, 'monthly', 1, 3, 400, 1000000, true),
+  ('pro', 'Pro', 500, 'monthly', 1, 5, 700, 1500000, true)
 ON CONFLICT (name)
 DO UPDATE SET
   display_name = EXCLUDED.display_name,

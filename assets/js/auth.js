@@ -294,7 +294,7 @@ async function renderDashboardState() {
     const paymentState = billing.payment_state || (billing.active ? "active" : "trial");
     const activePlanKey = planKeyFromBilling(billing);
     setText(statusElement, billingStatusLabel(paymentState, billing.plan?.name));
-    setText(planElement, billing.plan ? `${billing.plan.name} - ₹${billing.plan.price_inr}/${billing.plan.billing_interval}` : "Basic - ₹1/month");
+    setText(planElement, billing.plan ? `${billing.plan.name} - ₹${billing.plan.price_inr}/${billing.plan.billing_interval}` : "Basic - ₹350/month");
     setText(accessElement, billingAccessLabel(paymentState, billing.dashboard_access_allowed, billing.plan?.name));
     setButtonEnabled(subscribeButton, !billing.active && !billing.checkout_pending);
     if (subscribeButton) subscribeButton.classList.toggle("hidden", Boolean(billing.active));
@@ -317,7 +317,7 @@ async function renderDashboardState() {
   } catch (error) {
     console.error("Dashboard load failed:", error);
     setText(statusElement, "Backend offline");
-    setText(planElement, "Basic - ₹1/month");
+    setText(planElement, "Basic - ₹350/month");
     setText(accessElement, "Checkout is unavailable until the backend API is online.");
     setText(errorElement, "Backend API is not reachable at the configured URL. Deploy the backend or update productionBackendUrl.");
     setDashboardSetupVisible(false);
@@ -989,9 +989,9 @@ function billingButtonLabel(state, checkoutPending) {
   if (state === "active") return "Basic active";
   if (state === "cancel_requested") return "Basic active";
   if (checkoutPending) return "Activation pending";
-  if (state === "payment_failed") return "Retry ₹1/month payment";
-  if (state === "cancelled") return "Restart Basic - ₹1/month";
-  return "Start Basic - ₹1/month";
+  if (state === "payment_failed") return "Retry ₹350/month payment";
+  if (state === "cancelled") return "Restart Basic - ₹350/month";
+  return "Start Basic - ₹350/month";
 }
 
 function setUpgradeButtonState(button, billing, activePlanKey) {
@@ -999,7 +999,7 @@ function setUpgradeButtonState(button, billing, activePlanKey) {
 
   const canUpgrade = Boolean(billing.active) && activePlanKey === "basic" && !billing.checkout_pending;
   button.classList.toggle("hidden", !canUpgrade);
-  button.textContent = canUpgrade ? "Upgrade to Pro - INR 2/month" : "Pro active";
+  button.textContent = canUpgrade ? "Upgrade to Pro - INR 500/month" : "Pro active";
   setButtonEnabled(button, canUpgrade);
 }
 
@@ -1012,11 +1012,11 @@ function resetCheckoutButton(button) {
   if (!button) return;
 
   if ((button.getAttribute("data-subscribe-plan") || "basic") === "pro") {
-    button.textContent = "Upgrade to Pro - INR 2/month";
+    button.textContent = "Upgrade to Pro - INR 500/month";
     return;
   }
 
-  button.textContent = "Start Basic - ₹1/month";
+  button.textContent = "Start Basic - ₹350/month";
 }
 
 function pollDocumentsWhileProcessing() {
