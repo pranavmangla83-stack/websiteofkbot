@@ -48,7 +48,7 @@ documentsRouter.post("/upload", requireAuth, loadAccount, upload.single("pdf"), 
       return res.status(400).json({ error: "PDF file is required. Use form field name 'pdf'." });
     }
 
-    if (file.mimetype !== "application/pdf" && !file.originalname.toLowerCase().endsWith(".pdf")) {
+    if (!isPdfUpload(file)) {
       return res.status(400).json({ error: "Only PDF files are allowed." });
     }
 
@@ -211,6 +211,14 @@ async function getOwnedDocument(documentId, clientId) {
 
 function isUuid(value) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value));
+}
+
+function isPdfUpload(file) {
+  const hasPdfExtension = String(file.originalname || "").toLowerCase().endsWith(".pdf");
+  const allowedMimeType = ["application/pdf", "application/octet-stream"].includes(String(file.mimetype || "").toLowerCase());
+  const hasPdfMagicBytes = file.buffer?.subarray(0, 5).toString("ascii") === "%PDF-";
+
+  return hasPdfExtension && allowedMimeType && hasPdfMagicBytes;
 }
 
 async function processDocument(documentId, options) {

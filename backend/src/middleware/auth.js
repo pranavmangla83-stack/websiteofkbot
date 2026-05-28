@@ -30,7 +30,10 @@ export async function requireAuth(req, res, next) {
     };
     const unverifiedPayload = decodeJwt(token);
 
-    if (env.kindeAudience && tokenHasAudience(unverifiedPayload.aud, env.kindeAudience)) {
+    if (env.kindeAudience) {
+      if (!tokenHasAudience(unverifiedPayload.aud, env.kindeAudience)) {
+        return res.status(401).json({ error: "Login token is not valid for this API" });
+      }
       verifyOptions.audience = env.kindeAudience;
     }
 

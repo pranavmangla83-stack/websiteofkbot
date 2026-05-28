@@ -10,3 +10,5 @@ backend/tmp/
 *.md
 *.pdf
 !README.md
+!DEPLOYMENT_CHECKLIST.md
+!CUSTOMER_ONBOARDING_CHECKLIST.md

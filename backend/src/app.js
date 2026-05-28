@@ -1,5 +1,6 @@
 import cors from "cors";
 import express from "express";
+import rateLimit from "express-rate-limit";
 import helmet from "helmet";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -39,6 +40,30 @@ const publicCors = cors({
   allowedHeaders: ["Content-Type"]
 });
 
+const authenticatedApiLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  limit: 120,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many requests. Please wait a minute and try again." }
+});
+
+const uploadApiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many upload requests. Please wait and try again." }
+});
+
+const billingApiLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  limit: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many billing requests. Please wait a minute and try again." }
+});
+
 app.set("trust proxy", 1);
 app.use(helmet({
   crossOriginResourcePolicy: { policy: "cross-origin" }
@@ -67,12 +92,12 @@ app.get("/api/health", (req, res) => {
   });
 });
 
-app.use("/api/auth", adminCors, authRouter);
-app.use("/api/me", adminCors, meRouter);
-app.use("/api/admin", adminCors, adminRouter);
-app.use("/api/billing", adminCors, billingRouter);
-app.use("/api/documents", adminCors, documentsRouter);
-app.use("/api/website-pages", adminCors, websitePagesRouter);
+app.use("/api/auth", adminCors, authenticatedApiLimiter, authRouter);
+app.use("/api/me", adminCors, authenticatedApiLimiter, meRouter);
+app.use("/api/admin", adminCors, authenticatedApiLimiter, adminRouter);
+app.use("/api/billing", adminCors, billingApiLimiter, billingRouter);
+app.use("/api/documents", adminCors, uploadApiLimiter, documentsRouter);
+app.use("/api/website-pages", adminCors, authenticatedApiLimiter, websitePagesRouter);
 app.use("/api/chat", publicCors, chatRouter);
 app.use("/api", adminCors, scriptRouter);
 app.use("/api/db", adminCors, requireAuth, requireAdmin, testDbRouter);

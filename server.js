@@ -59,8 +59,8 @@ const server = http.createServer(async (req, res) => {
   serveStaticRequest(pathname, res);
 });
 
-server.requestTimeout = 30_000;
-server.headersTimeout = 35_000;
+server.requestTimeout = 180_000;
+server.headersTimeout = 185_000;
 server.keepAliveTimeout = 5_000;
 
 server.listen(port, host, () => {

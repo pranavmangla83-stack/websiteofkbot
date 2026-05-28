@@ -32,7 +32,7 @@ export const env = {
   razorpayBasicPlanId: envValue("RAZORPAY_BASIC_PLAN_ID"),
   razorpayProPlanId: envValue("RAZORPAY_PRO_PLAN_ID"),
   resendApiKey: envValue("RESEND_API_KEY"),
-  supportEmail: envValue("SUPPORT_EMAIL") || "pranavmangla410@gmail.com",
+  supportEmail: envValue("SUPPORT_EMAIL") || "support@example.com",
   notificationFromEmail: envValue("NOTIFICATION_FROM_EMAIL") || "Custom AI Chatbot <onboarding@resend.dev>",
   adminEmails: (process.env.ADMIN_EMAILS || "")
     .split(",")

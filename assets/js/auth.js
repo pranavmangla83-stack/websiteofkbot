@@ -25,9 +25,10 @@ async function initAuth() {
   kindeClient = await createKindeClient({
     client_id: kindeConfig.clientId,
     domain: kindeConfig.domain,
+    audience: kindeConfig.audience,
     redirect_uri: siteUrl,
     logout_uri: siteUrl,
-    is_dangerously_use_local_storage: true,
+    is_dangerously_use_local_storage: false,
     on_redirect_callback: function (_user, appState) {
       const redirectTo = getStoredRedirect(appState?.redirectTo);
       if (redirectTo && window.location.pathname !== redirectTo) {

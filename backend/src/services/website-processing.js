@@ -1,4 +1,6 @@
 import crypto from "node:crypto";
+import dns from "node:dns/promises";
+import net from "node:net";
 import { withTransaction } from "../db/pool.js";
 import { createEmbedding } from "./openai.js";
 import { cleanPdfText, splitTextIntoChunks } from "./pdf-processing.js";
@@ -102,6 +104,7 @@ export function normalizePublicUrl(value) {
     throw Object.assign(new Error("Only public http/https website pages are supported."), { statusCode: 400 });
   }
 
+  assertPublicHostname(url.hostname);
   url.hash = "";
   return url;
 }
@@ -223,6 +226,8 @@ async function saveFailedWebsitePage({ account, url, errorMessage }) {
 }
 
 async function fetchHtml(url) {
+  await assertPublicNetworkTarget(url);
+
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
 
@@ -253,6 +258,70 @@ async function fetchHtml(url) {
   } finally {
     clearTimeout(timeout);
   }
+}
+
+function assertPublicHostname(hostname) {
+  const normalized = String(hostname || "").toLowerCase();
+  if (
+    normalized === "localhost"
+    || normalized.endsWith(".localhost")
+    || normalized.endsWith(".local")
+    || normalized.endsWith(".internal")
+  ) {
+    throw Object.assign(new Error("Only public website URLs are supported."), { statusCode: 400 });
+  }
+
+  if (net.isIP(normalized) && isPrivateIp(normalized)) {
+    throw Object.assign(new Error("Only public website URLs are supported."), { statusCode: 400 });
+  }
+}
+
+async function assertPublicNetworkTarget(url) {
+  assertPublicHostname(url.hostname);
+
+  const records = await dns.lookup(url.hostname, { all: true, verbatim: true }).catch(() => []);
+  if (!records.length) {
+    throw new Error("Website hostname could not be resolved.");
+  }
+
+  if (records.some((record) => isPrivateIp(record.address))) {
+    throw Object.assign(new Error("Only public website URLs are supported."), { statusCode: 400 });
+  }
+}
+
+function isPrivateIp(address) {
+  const ipVersion = net.isIP(address);
+  if (ipVersion === 4) return isPrivateIpv4(address);
+  if (ipVersion === 6) return isPrivateIpv6(address);
+  return false;
+}
+
+function isPrivateIpv4(address) {
+  const parts = address.split(".").map((part) => Number(part));
+  if (parts.length !== 4 || parts.some((part) => !Number.isInteger(part) || part < 0 || part > 255)) return true;
+  const [a, b] = parts;
+
+  return a === 0
+    || a === 10
+    || a === 127
+    || (a === 169 && b === 254)
+    || (a === 172 && b >= 16 && b <= 31)
+    || (a === 192 && b === 168)
+    || a >= 224;
+}
+
+function isPrivateIpv6(address) {
+  const normalized = address.toLowerCase();
+  if (normalized.startsWith("::ffff:")) {
+    return isPrivateIpv4(normalized.slice("::ffff:".length));
+  }
+
+  return normalized === "::1"
+    || normalized === "::"
+    || normalized.startsWith("fc")
+    || normalized.startsWith("fd")
+    || normalized.startsWith("fe80:")
+    || normalized.startsWith("2001:db8:");
 }
 
 function extractPageText(html, url) {
