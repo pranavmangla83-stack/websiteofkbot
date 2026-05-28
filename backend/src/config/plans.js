@@ -5,7 +5,7 @@ export const PLAN_LIMITS = {
     maxPdfs: 3,
     maxPdfSizeMb: 7,
     monthlyReplies: 400,
-    price: 1
+    price: 350
   },
   pro: {
     websiteCrawling: true,
@@ -13,7 +13,7 @@ export const PLAN_LIMITS = {
     maxPdfs: 5,
     maxPdfSizeMb: 10,
     monthlyReplies: 700,
-    price: 2
+    price: 500
   }
 };
 
