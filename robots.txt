@@ -4,6 +4,20 @@ Disallow: /admin
 Disallow: /dashboard
 Disallow: /client
 
+User-agent: AdsBot-Google
+Allow: /
+Disallow: /api/
+Disallow: /admin
+Disallow: /dashboard
+Disallow: /client
+
+User-agent: Googlebot
+Allow: /
+Disallow: /api/
+Disallow: /admin
+Disallow: /dashboard
+Disallow: /client
+
 User-agent: GPTBot
 Disallow: /
 

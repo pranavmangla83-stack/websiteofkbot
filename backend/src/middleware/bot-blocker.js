@@ -15,6 +15,7 @@ const blockedPathPatterns = [
 ];
 
 const blockedUserAgentPattern = /\b(?:aiohttp|python-requests|python\/|curl|wget|nikto|sqlmap|masscan|zgrab)\b|headlesschrome/i;
+const allowedGoogleCrawlerPattern = /\b(?:AdsBot-Google|Googlebot|Google-InspectionTool|Mediapartners-Google|APIs-Google)\b/i;
 
 export function blockScannerTraffic(req, res, next) {
   const pathname = req.path || "/";
@@ -22,6 +23,10 @@ export function blockScannerTraffic(req, res, next) {
 
   if (blockedPathPatterns.some((pattern) => pattern.test(pathname))) {
     return res.status(403).type("text/plain").send("Forbidden");
+  }
+
+  if (allowedGoogleCrawlerPattern.test(userAgent)) {
+    return next();
   }
 
   if (blockedUserAgentPattern.test(userAgent)) {

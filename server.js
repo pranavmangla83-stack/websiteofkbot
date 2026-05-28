@@ -169,6 +169,8 @@ function isBlockedScannerRequest(req) {
   const userAgent = req.headers["user-agent"] || "";
   const blockedPath = /^\/(?:wp-admin|wp-login\.php|wp-content|wp-includes|xmlrpc\.php|wordpress|phpmyadmin|pma|adminer|\.env|\.git|vendor|composer\.(?:json|lock))(?:\/|$)/i;
   const blockedUserAgent = /\b(?:aiohttp|python-requests|python\/|curl|wget|nikto|sqlmap|masscan|zgrab)\b|headlesschrome|cms-checker|internetmeasurement/i;
+  const allowedGoogleCrawler = /\b(?:AdsBot-Google|Googlebot|Google-InspectionTool|Mediapartners-Google|APIs-Google)\b/i;
 
+  if (allowedGoogleCrawler.test(userAgent)) return blockedPath.test(pathname);
   return blockedPath.test(pathname) || blockedUserAgent.test(userAgent);
 }
