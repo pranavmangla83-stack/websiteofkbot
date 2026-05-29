@@ -1,5 +1,5 @@
 import createKindeClient from "../vendor/kinde-auth-pkce-js.esm.js";
-import { kindeConfig } from "./kinde-config.js?v=198cfd1";
+import { kindeConfig } from "./kinde-config.js?v=20260530-restore";
 
 const isLocalhost = ["localhost", "127.0.0.1"].includes(window.location.hostname);
 const siteUrl = isLocalhost ? kindeConfig.localSiteUrl : kindeConfig.productionSiteUrl;
@@ -25,10 +25,9 @@ async function initAuth() {
   kindeClient = await createKindeClient({
     client_id: kindeConfig.clientId,
     domain: kindeConfig.domain,
-    audience: kindeConfig.audience,
     redirect_uri: siteUrl,
     logout_uri: siteUrl,
-    is_dangerously_use_local_storage: false,
+    is_dangerously_use_local_storage: true,
     on_redirect_callback: function (_user, appState) {
       const redirectTo = getStoredRedirect(appState?.redirectTo);
       if (redirectTo && window.location.pathname !== redirectTo) {
