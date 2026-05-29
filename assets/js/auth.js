@@ -1,5 +1,5 @@
 import createKindeClient from "../vendor/kinde-auth-pkce-js.esm.js";
-import { kindeConfig } from "./kinde-config.js?v=20260530-login";
+import { kindeConfig } from "./kinde-config.js?v=198cfd1";
 
 const isLocalhost = ["localhost", "127.0.0.1"].includes(window.location.hostname);
 const siteUrl = isLocalhost ? kindeConfig.localSiteUrl : kindeConfig.productionSiteUrl;
@@ -248,19 +248,8 @@ async function protectCurrentPage() {
   const isAuthenticated = await kindeClient.isAuthenticated();
   if (!isAuthenticated) {
     showProtectedLoginRequired();
-    await startProtectedLogin();
     throw new Error("Authentication is required for this page.");
   }
-}
-
-async function startProtectedLogin() {
-  if (authFlowStarting) return;
-  authFlowStarting = true;
-
-  const redirectTo = normalizeRedirectPath(window.location.pathname) || dashboardPath;
-  storeRedirect(redirectTo);
-  storeAuthIntent(redirectTo);
-  await kindeClient.login({ app_state: { redirectTo } });
 }
 
 function showProtectedLoginRequired() {
