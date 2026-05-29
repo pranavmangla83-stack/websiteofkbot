@@ -30,11 +30,12 @@ export async function requireAuth(req, res, next) {
     };
     const unverifiedPayload = decodeJwt(token);
 
-    if (env.kindeAudience) {
-      if (!tokenHasAudience(unverifiedPayload.aud, env.kindeAudience)) {
+    const allowedAudiences = [env.kindeAudience, env.kindeClientId].filter(Boolean);
+    if (allowedAudiences.length) {
+      if (!tokenHasAllowedAudience(unverifiedPayload.aud, allowedAudiences)) {
         return res.status(401).json({ error: "Login token is not valid for this API" });
       }
-      verifyOptions.audience = env.kindeAudience;
+      verifyOptions.audience = allowedAudiences;
     }
 
     const { payload } = await jwtVerify(token, verifier.jwks, verifyOptions);
@@ -61,7 +62,10 @@ export async function requireAuth(req, res, next) {
   }
 }
 
-function tokenHasAudience(tokenAudience, expectedAudience) {
-  if (Array.isArray(tokenAudience)) return tokenAudience.includes(expectedAudience);
-  return tokenAudience === expectedAudience;
+function tokenHasAllowedAudience(tokenAudience, allowedAudiences) {
+  if (Array.isArray(tokenAudience)) {
+    return allowedAudiences.some((audience) => tokenAudience.includes(audience));
+  }
+
+  return allowedAudiences.includes(tokenAudience);
 }
