@@ -1,5 +1,5 @@
 import createKindeClient from "../vendor/kinde-auth-pkce-js.esm.js";
-import { kindeConfig } from "./kinde-config.js";
+import { kindeConfig } from "./kinde-config.js?v=198cfd1";
 
 const isLocalhost = ["localhost", "127.0.0.1"].includes(window.location.hostname);
 const siteUrl = isLocalhost ? kindeConfig.localSiteUrl : kindeConfig.productionSiteUrl;
