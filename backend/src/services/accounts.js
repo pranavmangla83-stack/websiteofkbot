@@ -1,6 +1,9 @@
 import { withTransaction } from "../db/pool.js";
+import { env } from "../config/env.js";
 
 export async function syncUserAndTenant(auth) {
+  const profile = await getAuthProfile(auth);
+
   return withTransaction(async (db) => {
     const clientResult = await db.query(
       `
@@ -14,7 +17,7 @@ export async function syncUserAndTenant(auth) {
           updated_at = now()
         RETURNING *
       `,
-      [auth.kindeUserId, auth.email, auth.name, defaultCompanyName(auth)]
+      [profile.kindeUserId, profile.email, profile.name, defaultCompanyName(profile)]
     );
 
     const clientAccount = clientResult.rows[0];
@@ -30,7 +33,7 @@ export async function syncUserAndTenant(auth) {
           full_name = COALESCE(EXCLUDED.full_name, users.full_name),
           updated_at = now()
       `,
-      [clientAccount.id, auth.kindeUserId, auth.email, auth.name]
+      [clientAccount.id, profile.kindeUserId, profile.email, profile.name]
     );
 
     const chatbot = await ensureDefaultChatbot(db, clientAccount);
@@ -155,4 +158,53 @@ function defaultCompanyName(auth) {
   if (auth.name) return auth.name;
   if (auth.email) return auth.email.split("@")[0];
   return "My Company";
+}
+
+async function getAuthProfile(auth) {
+  const userInfo = await fetchKindeUserInfo(auth).catch((error) => {
+    console.warn("Kinde userinfo lookup failed:", error.message);
+    return null;
+  });
+
+  return {
+    ...auth,
+    email: auth.email || userInfo?.email || null,
+    name: auth.name || userInfo?.name || userInfoName(userInfo) || null
+  };
+}
+
+async function fetchKindeUserInfo(auth) {
+  if (!auth?.accessToken || !env.kindeIssuerUrl) return null;
+
+  const issuer = env.kindeIssuerUrl.replace(/\/$/, "");
+  const discoveryResponse = await fetch(`${issuer}/.well-known/openid-configuration`);
+
+  if (!discoveryResponse.ok) {
+    throw new Error(`OIDC discovery returned ${discoveryResponse.status}`);
+  }
+
+  const discovery = await discoveryResponse.json();
+  const userInfoEndpoint = discovery.userinfo_endpoint || `${issuer}/oauth2/user_profile`;
+  const userInfoResponse = await fetch(userInfoEndpoint, {
+    headers: {
+      Authorization: `Bearer ${auth.accessToken}`,
+      Accept: "application/json"
+    }
+  });
+
+  if (!userInfoResponse.ok) {
+    throw new Error(`userinfo returned ${userInfoResponse.status}`);
+  }
+
+  const userInfo = await userInfoResponse.json();
+
+  if (userInfo.sub && userInfo.sub !== auth.kindeUserId) {
+    throw new Error("userinfo subject does not match verified token subject");
+  }
+
+  return userInfo;
+}
+
+function userInfoName(userInfo) {
+  return [userInfo?.given_name, userInfo?.family_name].filter(Boolean).join(" ") || null;
 }

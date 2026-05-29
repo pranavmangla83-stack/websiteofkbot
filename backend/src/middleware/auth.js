@@ -47,6 +47,7 @@ export async function requireAuth(req, res, next) {
       kindeUserId: payload.sub,
       email: payload.email || null,
       name: payload.name || [payload.given_name, payload.family_name].filter(Boolean).join(" ") || null,
+      accessToken: token,
       claims: payload
     };
 
