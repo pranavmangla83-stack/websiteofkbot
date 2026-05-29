@@ -23,11 +23,12 @@ export const app = express();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const projectRoot = path.resolve(__dirname, "../..");
+const allowedAdminOrigins = adminOrigins(env.frontendUrl);
 
 const adminCors = cors({
   origin: (origin, callback) => {
     if (!origin) return callback(null, true);
-    return callback(null, origin === env.frontendUrl);
+    return callback(null, allowedAdminOrigins.has(origin));
   },
   credentials: true,
   methods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
@@ -133,3 +134,32 @@ app.get(Array.from(frontendRoutes.keys()), (req, res) => {
 
 app.use(notFound);
 app.use(errorHandler);
+
+function adminOrigins(frontendUrl) {
+  const origins = new Set();
+  addOrigin(origins, frontendUrl);
+
+  try {
+    const url = new URL(frontendUrl);
+    if (url.hostname.startsWith("www.")) {
+      url.hostname = url.hostname.slice(4);
+      addOrigin(origins, url.origin);
+    } else {
+      url.hostname = `www.${url.hostname}`;
+      addOrigin(origins, url.origin);
+    }
+  } catch (_error) {
+    // Invalid frontend URLs are handled by the exact-origin check above.
+  }
+
+  return origins;
+}
+
+function addOrigin(origins, value) {
+  if (!value) return;
+  try {
+    origins.add(new URL(value).origin);
+  } catch (_error) {
+    origins.add(value);
+  }
+}
