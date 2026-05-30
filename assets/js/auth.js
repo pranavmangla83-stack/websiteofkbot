@@ -110,7 +110,7 @@ async function startAuthFlow(type, element) {
   try {
     const checkoutPlan = normalizePlanKey(element?.getAttribute("data-checkout-plan"));
     const redirectTo = checkoutPlan
-      ? dashboardPath
+      ? checkoutRedirectPath(checkoutPlan)
       : normalizeRedirectPath(element?.getAttribute("data-redirect-to")) || dashboardPath;
     const isAuthenticated = await kindeClient.isAuthenticated();
 
@@ -142,7 +142,7 @@ async function startAuthFlow(type, element) {
 
 async function redirectAuthenticatedIntent() {
   const redirectTo = readAuthIntentRedirect();
-  if (!redirectTo || window.location.pathname === redirectTo) return false;
+  if (!redirectTo || currentPathWithSearch() === redirectTo) return false;
   const isAuthenticated = await kindeClient.isAuthenticated();
   if (!isAuthenticated) return false;
 
@@ -231,6 +231,9 @@ function storeCheckoutIntent(planKey) {
 }
 
 function readCheckoutIntent() {
+  const queryPlan = normalizePlanKey(new URLSearchParams(window.location.search).get("checkout"));
+  if (queryPlan) return queryPlan;
+
   try {
     const intent = JSON.parse(window.localStorage.getItem(checkoutIntentStorageKey) || "null");
     if (!intent || Date.now() - Number(intent.createdAt || 0) > 10 * 60 * 1000) {
@@ -254,6 +257,14 @@ function clearCheckoutIntent() {
 function normalizePlanKey(value) {
   const planKey = String(value || "").trim().toLowerCase();
   return ["basic", "pro"].includes(planKey) ? planKey : "";
+}
+
+function checkoutRedirectPath(planKey) {
+  return `${dashboardPath}?checkout=${encodeURIComponent(planKey)}`;
+}
+
+function currentPathWithSearch() {
+  return `${window.location.pathname}${window.location.search}`;
 }
 
 function normalizeRedirectPath(value) {
@@ -456,13 +467,22 @@ async function continuePendingCheckoutIntent(billing) {
 
   if (billing.active && activePlanKey === planKey && paymentState !== "payment_failed") {
     clearCheckoutIntent();
+    clearCheckoutQueryParam();
     setText(statusElement, `${billing.plan?.name || planKey} is already active.`);
     return;
   }
 
   clearCheckoutIntent();
+  clearCheckoutQueryParam();
   const subscribeButton = document.querySelector(`[data-subscribe-plan="${planKey}"]`);
   await startCheckout(planKey, subscribeButton);
+}
+
+function clearCheckoutQueryParam() {
+  if (!new URLSearchParams(window.location.search).has("checkout")) return;
+
+  const cleanUrl = `${window.location.pathname}${window.location.hash || ""}`;
+  window.history.replaceState({}, document.title, cleanUrl);
 }
 
 async function startCheckout(planKey, subscribeButton) {
