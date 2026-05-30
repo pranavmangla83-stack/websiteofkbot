@@ -7,6 +7,7 @@ const backendUrl = (isLocalhost ? kindeConfig.localBackendUrl : kindeConfig.prod
 const dashboardPath = "/dashboard.html";
 const redirectStorageKey = "kbot_post_auth_redirect";
 const authIntentStorageKey = "kbot_auth_intent";
+const checkoutIntentStorageKey = "kbot_checkout_intent";
 
 let kindeClient;
 let currentAccount;
@@ -107,16 +108,21 @@ async function startAuthFlow(type, element) {
   if (element) element.dataset.authStarting = "true";
 
   try {
-    const redirectTo = normalizeRedirectPath(element?.getAttribute("data-redirect-to")) || dashboardPath;
+    const checkoutPlan = normalizePlanKey(element?.getAttribute("data-checkout-plan"));
+    const redirectTo = checkoutPlan
+      ? dashboardPath
+      : normalizeRedirectPath(element?.getAttribute("data-redirect-to")) || dashboardPath;
     const isAuthenticated = await kindeClient.isAuthenticated();
 
     if (isAuthenticated) {
+      if (checkoutPlan) storeCheckoutIntent(checkoutPlan);
       window.location.assign(redirectTo);
       return;
     }
 
     storeRedirect(redirectTo);
     storeAuthIntent(redirectTo);
+    if (checkoutPlan) storeCheckoutIntent(checkoutPlan);
     setButtonEnabled(element, false);
     const options = { app_state: { redirectTo } };
 
@@ -211,6 +217,43 @@ function clearAuthIntent() {
   } catch (_error) {
     // Nothing to clear when storage is blocked.
   }
+}
+
+function storeCheckoutIntent(planKey) {
+  try {
+    window.localStorage.setItem(checkoutIntentStorageKey, JSON.stringify({
+      plan: planKey,
+      createdAt: Date.now()
+    }));
+  } catch (_error) {
+    // Checkout intent only helps continue after login.
+  }
+}
+
+function readCheckoutIntent() {
+  try {
+    const intent = JSON.parse(window.localStorage.getItem(checkoutIntentStorageKey) || "null");
+    if (!intent || Date.now() - Number(intent.createdAt || 0) > 10 * 60 * 1000) {
+      window.localStorage.removeItem(checkoutIntentStorageKey);
+      return "";
+    }
+    return normalizePlanKey(intent.plan);
+  } catch (_error) {
+    return "";
+  }
+}
+
+function clearCheckoutIntent() {
+  try {
+    window.localStorage.removeItem(checkoutIntentStorageKey);
+  } catch (_error) {
+    // Nothing to clear when storage is blocked.
+  }
+}
+
+function normalizePlanKey(value) {
+  const planKey = String(value || "").trim().toLowerCase();
+  return ["basic", "pro"].includes(planKey) ? planKey : "";
 }
 
 function normalizeRedirectPath(value) {
@@ -314,6 +357,8 @@ async function renderDashboardState() {
       await renderDocuments();
       await renderWebsitePages();
     }
+
+    await continuePendingCheckoutIntent(billing);
   } catch (error) {
     console.error("Dashboard load failed:", error);
     setText(statusElement, "Backend offline");
@@ -395,16 +440,43 @@ document.addEventListener("click", async function (event) {
   event.preventDefault();
   if (subscribeButton.disabled) return;
 
-  const statusElement = document.querySelector("[data-dashboard-error]");
   const planKey = subscribeButton.getAttribute("data-subscribe-plan") || "basic";
+  await startCheckout(planKey, subscribeButton);
+});
+
+async function continuePendingCheckoutIntent(billing) {
+  if (!document.body.hasAttribute("data-dashboard-page")) return;
+
+  const planKey = readCheckoutIntent();
+  if (!planKey) return;
+
+  const activePlanKey = planKeyFromBilling(billing);
+  const paymentState = billing.payment_state || (billing.active ? "active" : "trial");
+  const statusElement = document.querySelector("[data-dashboard-error]");
+
+  if (billing.active && activePlanKey === planKey && paymentState !== "payment_failed") {
+    clearCheckoutIntent();
+    setText(statusElement, `${billing.plan?.name || planKey} is already active.`);
+    return;
+  }
+
+  clearCheckoutIntent();
+  const subscribeButton = document.querySelector(`[data-subscribe-plan="${planKey}"]`);
+  await startCheckout(planKey, subscribeButton);
+}
+
+async function startCheckout(planKey, subscribeButton) {
+  const normalizedPlanKey = normalizePlanKey(planKey) || "basic";
+  const statusElement = document.querySelector("[data-dashboard-error]");
+
   setButtonEnabled(subscribeButton, false);
-  subscribeButton.textContent = "Preparing checkout...";
+  if (subscribeButton) subscribeButton.textContent = "Preparing checkout...";
   setText(statusElement, "Creating Razorpay subscription...");
 
   try {
     const data = await apiFetch("/api/billing/create-subscription", {
       method: "POST",
-      body: JSON.stringify({ plan: planKey })
+      body: JSON.stringify({ plan: normalizedPlanKey })
     });
     openRazorpayCheckout(data.checkout, subscribeButton);
     setText(statusElement, "Checkout opened. Complete the Razorpay payment.");
@@ -414,7 +486,7 @@ document.addEventListener("click", async function (event) {
     setButtonEnabled(subscribeButton, true);
     resetCheckoutButton(subscribeButton);
   }
-});
+}
 
 document.addEventListener("submit", async function (event) {
   const websiteForm = event.target.closest("[data-website-url-form]");
