@@ -22,7 +22,7 @@ Use this before every production launch or payment-flow change.
 ## Database
 
 - `npm run db:migrate` completed successfully.
-- `plans` contains Basic INR 250/month and Pro INR 500/month.
+- `plans` contains Basic INR 100/month and Pro INR 500/month.
 - RLS is enabled on tenant tables.
 - `client-pdfs` bucket is private and limited to PDF MIME type.
 - Vector index exists on `document_chunks.embedding`.
@@ -32,7 +32,7 @@ Use this before every production launch or payment-flow change.
 - New signup reaches dashboard after Kinde redirect.
 - `POST /api/auth/sync-user` creates client, user, and default chatbot.
 - `GET /api/me` returns only the logged-in tenant.
-- Basic checkout opens with INR 250/month.
+- Basic checkout opens with INR 100/month.
 - Pro checkout opens with INR 500/month.
 - Payment verification does not activate features until webhook/subscription status is active.
 - Razorpay webhook rejects invalid signatures.
