@@ -498,7 +498,7 @@ async function startCheckout(planKey, subscribeButton) {
       method: "POST",
       body: JSON.stringify({ plan: normalizedPlanKey })
     });
-    openRazorpayCheckout(data.checkout, subscribeButton);
+    openRazorpayCheckout(data.checkout, subscribeButton, data.plan);
     setText(statusElement, "Checkout opened. Complete the Razorpay payment.");
   } catch (error) {
     console.error("Subscription creation failed:", error);
@@ -1200,7 +1200,7 @@ function escapeAttr(value) {
   return escapeHtml(value).replace(/`/g, "&#096;");
 }
 
-function openRazorpayCheckout(checkout, subscribeButton) {
+function openRazorpayCheckout(checkout, subscribeButton, plan) {
   if (!window.Razorpay) {
     throw new Error("Razorpay Checkout script is not loaded");
   }
@@ -1217,6 +1217,7 @@ function openRazorpayCheckout(checkout, subscribeButton) {
           method: "POST",
           body: JSON.stringify(response)
         });
+        pushPurchaseEvent(response, plan);
         await renderDashboardState();
       } catch (error) {
         console.error("Razorpay checkout verification failed:", error);
@@ -1235,6 +1236,19 @@ function openRazorpayCheckout(checkout, subscribeButton) {
   });
 
   razorpay.open();
+}
+
+function pushPurchaseEvent(response, plan) {
+  const transactionId = response?.razorpay_payment_id;
+  if (!transactionId) return;
+
+  window.dataLayer = window.dataLayer || [];
+  window.dataLayer.push({
+    event: "purchase",
+    transaction_id: transactionId,
+    value: Number(plan?.price_inr || 350),
+    currency: "INR"
+  });
 }
 
 function setText(element, value) {
