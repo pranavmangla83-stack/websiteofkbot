@@ -8,6 +8,7 @@ const dashboardPath = "/dashboard.html";
 const redirectStorageKey = "kbot_post_auth_redirect";
 const authIntentStorageKey = "kbot_auth_intent";
 const checkoutIntentStorageKey = "kbot_checkout_intent";
+const analyticsLoginStorageKey = "kbot_analytics_login_tracked";
 
 let kindeClient;
 let currentAccount;
@@ -46,6 +47,7 @@ async function initAuth() {
   if (await redirectAuthenticatedHome()) return;
   await protectCurrentPage();
   await syncAuthenticatedUser();
+  await startPendingCheckoutBeforeDashboard();
   await renderDashboardState();
   await renderAdminState();
 }
@@ -322,10 +324,30 @@ async function syncAuthenticatedUser() {
   if (!isAuthenticated) return;
 
   try {
-    await apiFetch("/api/auth/sync-user", { method: "POST" });
+    const account = await apiFetch("/api/auth/sync-user", { method: "POST" });
+    pushLoginEventOnce(account);
   } catch (error) {
     console.error("Backend user sync failed:", error);
   }
+}
+
+async function startPendingCheckoutBeforeDashboard() {
+  if (!document.body.hasAttribute("data-dashboard-page")) return false;
+
+  const planKey = readCheckoutIntent();
+  if (!planKey) return false;
+
+  clearCheckoutIntent();
+  clearCheckoutQueryParam();
+
+  const statusElement = document.querySelector("[data-dashboard-error]");
+  const subscribeButton = document.querySelector(`[data-subscribe-plan="${planKey}"]`);
+  setText(statusElement, "Login complete. Opening Razorpay checkout...");
+  const result = await startCheckout(planKey, subscribeButton);
+  if (!result.opened && result.retryable) {
+    setPendingCheckoutPrompt(planKey, subscribeButton, statusElement);
+  }
+  return true;
 }
 
 async function renderDashboardState() {
@@ -452,9 +474,6 @@ document.addEventListener("click", async function (event) {
   if (subscribeButton.disabled) return;
 
   const planKey = subscribeButton.getAttribute("data-subscribe-plan") || "basic";
-  if (normalizePlanKey(planKey) === "basic") {
-    pushBeginCheckoutEvent(subscribeButton);
-  }
   await startCheckout(planKey, subscribeButton);
 });
 
@@ -478,7 +497,28 @@ async function continuePendingCheckoutIntent(billing) {
   clearCheckoutIntent();
   clearCheckoutQueryParam();
   const subscribeButton = document.querySelector(`[data-subscribe-plan="${planKey}"]`);
-  await startCheckout(planKey, subscribeButton);
+  setText(statusElement, "Login complete. Opening Razorpay checkout...");
+  const result = await startCheckout(planKey, subscribeButton);
+  if (!result.opened && result.retryable) {
+    setPendingCheckoutPrompt(planKey, subscribeButton, statusElement);
+  }
+}
+
+function setPendingCheckoutPrompt(planKey, subscribeButton, statusElement) {
+  const normalizedPlanKey = normalizePlanKey(planKey) || "basic";
+  if (subscribeButton) {
+    subscribeButton.textContent = normalizedPlanKey === "pro"
+      ? "Continue to Pro payment"
+      : "Continue to payment - ₹100/month";
+    setButtonEnabled(subscribeButton, true);
+    subscribeButton.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+
+  setText(statusElement, "Login complete. Tap the payment button to open Razorpay securely.");
+  pushCheckoutDiagnosticEvent("checkout_fallback_shown", {
+    plan_name: normalizedPlanKey,
+    price: normalizedPlanKey === "pro" ? 500 : 100
+  });
 }
 
 function clearCheckoutQueryParam() {
@@ -501,13 +541,18 @@ async function startCheckout(planKey, subscribeButton) {
       method: "POST",
       body: JSON.stringify({ plan: normalizedPlanKey })
     });
-    openRazorpayCheckout(data.checkout, subscribeButton, data.plan);
-    setText(statusElement, "Checkout opened. Complete the Razorpay payment.");
+    pushCheckoutDiagnosticEvent("checkout_open_attempt", planParams(data.plan));
+    if (openRazorpayCheckout(data.checkout, subscribeButton, data.plan)) {
+      setText(statusElement, "Checkout opened. Complete the Razorpay payment.");
+      return { opened: true, retryable: false };
+    }
+    return { opened: false, retryable: true };
   } catch (error) {
     console.error("Subscription creation failed:", error);
     setText(statusElement, error.message || "Could not start checkout. Confirm Razorpay env values and the plan id.");
     setButtonEnabled(subscribeButton, true);
     resetCheckoutButton(subscribeButton);
+    return { opened: false, retryable: false };
   }
 }
 
@@ -1238,40 +1283,99 @@ function openRazorpayCheckout(checkout, subscribeButton, plan) {
     }
   });
 
-  razorpay.open();
+  try {
+    razorpay.open();
+    pushBeginCheckoutEvent(plan);
+    return true;
+  } catch (error) {
+    console.error("Razorpay checkout could not open:", error);
+    const errorElement = document.querySelector("[data-dashboard-error]");
+    setText(errorElement, "Payment window could not open. Please tap the payment button again.");
+    setButtonEnabled(subscribeButton, true);
+    resetCheckoutButton(subscribeButton);
+    pushCheckoutDiagnosticEvent("checkout_open_failed", {
+      ...planParams(plan),
+      error_message: error?.message || "Razorpay open failed"
+    });
+    return false;
+  }
 }
 
 function pushPurchaseEvent(response, plan) {
   const transactionId = response?.razorpay_payment_id;
   if (!transactionId) return;
 
-  window.dataLayer = window.dataLayer || [];
-  window.dataLayer.push({
-    event: "purchase",
+  pushAnalyticsEvent("purchase", {
     transaction_id: transactionId,
     value: Number(plan?.price_inr || 100),
-    currency: "INR"
+    currency: "INR",
+    plan_name: normalizePlanName(plan?.name || plan?.display_name || "basic")
   });
 }
 
-function pushBeginCheckoutEvent(button) {
-  const params = {
-    plan_name: "basic",
-    price: 100,
-    currency: "INR",
-    button_id: button?.id || "",
-    page_location: window.location.href
-  };
+function pushLoginEventOnce(account) {
+  const userId = account?.user?.id || account?.tenant?.id || "";
+  const storageValue = userId || "current_session";
 
+  try {
+    if (window.sessionStorage.getItem(analyticsLoginStorageKey) === storageValue) return;
+    window.sessionStorage.setItem(analyticsLoginStorageKey, storageValue);
+  } catch (_error) {
+    // Analytics should never block auth when storage is unavailable.
+  }
+
+  pushAnalyticsEvent("login", {
+    method: "kinde",
+    page_location: window.location.href
+  });
+}
+
+function pushBeginCheckoutEvent(plan) {
+  pushAnalyticsEvent("begin_checkout", {
+    ...planParams(plan),
+    page_location: window.location.href
+  });
+}
+
+function pushCheckoutDiagnosticEvent(eventName, params = {}) {
+  pushAnalyticsEvent(eventName, {
+    ...params,
+    device_type: deviceType(),
+    user_agent: window.navigator.userAgent,
+    page_location: window.location.href
+  });
+}
+
+function pushAnalyticsEvent(eventName, params = {}) {
   window.dataLayer = window.dataLayer || [];
   window.dataLayer.push({
-    event: "begin_checkout",
+    event: eventName,
     ...params
   });
 
   if (typeof window.gtag === "function") {
-    window.gtag("event", "begin_checkout", params);
+    window.gtag("event", eventName, params);
   }
+}
+
+function normalizePlanName(value) {
+  return String(value || "").trim().toLowerCase().includes("pro") ? "pro" : "basic";
+}
+
+function planParams(plan) {
+  const planName = normalizePlanName(plan?.name || plan?.display_name || "basic");
+  return {
+    plan_name: planName,
+    price: Number(plan?.price_inr || (planName === "pro" ? 500 : 100)),
+    currency: "INR"
+  };
+}
+
+function deviceType() {
+  const userAgent = window.navigator.userAgent || "";
+  if (/ipad|tablet/i.test(userAgent)) return "tablet";
+  if (/mobi|android|iphone|ipod/i.test(userAgent)) return "mobile";
+  return "desktop";
 }
 
 function setText(element, value) {

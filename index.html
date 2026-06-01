@@ -444,33 +444,7 @@
     </div>
   </footer>
 
-  <script>
-    (function () {
-      function trackBasicBeginCheckout(element) {
-        var params = {
-          plan_name: "basic",
-          price: 100,
-          currency: "INR",
-          button_id: element.id || "",
-          page_location: window.location.href
-        };
-
-        window.dataLayer = window.dataLayer || [];
-        window.dataLayer.push(Object.assign({ event: "begin_checkout" }, params));
-
-        if (typeof window.gtag === "function") {
-          window.gtag("event", "begin_checkout", params);
-        }
-      }
-
-      document.querySelectorAll('[data-checkout-plan="basic"]').forEach(function (element) {
-        element.addEventListener("click", function () {
-          trackBasicBeginCheckout(element);
-        });
-      });
-    })();
-  </script>
-  <script type="module" src="/assets/js/auth.js?v=20260531-checkout-event"></script>
+  <script type="module" src="/assets/js/auth.js?v=20260602-fast-checkout"></script>
   <script src="https://customaichatbot.online/widget.js" data-client-id="ff9b7b19-d806-48d9-9e89-1be2a9901630" data-chatbot-key="07dcecc5d2abcf89515cdfb0f7fb4aad9d2d"></script>
 </body>
 </html>

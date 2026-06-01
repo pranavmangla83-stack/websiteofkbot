@@ -10,6 +10,8 @@ export const billingRouter = express.Router();
 
 const RAZORPAY_PAISE_PER_RUPEE = 100;
 const RAZORPAY_EXPECTED_CURRENCY = "INR";
+const PLAN_VALIDATION_CACHE_MS = 5 * 60 * 1000;
+const planValidationCache = new Map();
 const PLAN_ENV_KEYS = {
   basic: "razorpayBasicPlanId",
   pro: "razorpayProPlanId"
@@ -580,11 +582,21 @@ async function verifyCheckoutWithRazorpayApi({ razorpayPaymentId, razorpaySubscr
 }
 
 async function assertRazorpayPlanMatchesLocalPlan(plan, planEnvKey) {
-  const razorpayPlan = await getRazorpay().plans.fetch(env[planEnvKey]);
   const expectedAmount = Number(plan.price_inr) * RAZORPAY_PAISE_PER_RUPEE;
+  const expectedPeriod = String(plan.billing_interval || "").toLowerCase() === "yearly" ? "yearly" : "monthly";
+  const cacheKey = [
+    env[planEnvKey],
+    expectedAmount,
+    RAZORPAY_EXPECTED_CURRENCY,
+    expectedPeriod,
+    1
+  ].join(":");
+  const cached = planValidationCache.get(cacheKey);
+  if (cached && cached > Date.now()) return;
+
+  const razorpayPlan = await getRazorpay().plans.fetch(env[planEnvKey]);
   const actualAmount = Number(razorpayPlan.item?.amount);
   const actualCurrency = String(razorpayPlan.item?.currency || "").toUpperCase();
-  const expectedPeriod = String(plan.billing_interval || "").toLowerCase() === "yearly" ? "yearly" : "monthly";
   const actualPeriod = String(razorpayPlan.period || "").toLowerCase();
   const actualInterval = Number(razorpayPlan.interval || 0);
 
@@ -599,6 +611,8 @@ async function assertRazorpayPlanMatchesLocalPlan(plan, planEnvKey) {
       `configured plan is ${actualCurrency || "UNKNOWN"} ${Number.isFinite(actualAmount) ? actualAmount / RAZORPAY_PAISE_PER_RUPEE : "UNKNOWN"}/${actualPeriod || "UNKNOWN"}.`
     );
   }
+
+  planValidationCache.set(cacheKey, Date.now() + PLAN_VALIDATION_CACHE_MS);
 }
 
 function removesPaidEntitlement(status) {
