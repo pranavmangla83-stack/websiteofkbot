@@ -1,5 +1,11 @@
 import createKindeClient from "../vendor/kinde-auth-pkce-js.esm.js";
 import { kindeConfig } from "./kinde-config.js?v=20260530-restore";
+import {
+  BASIC_PLAN_NAME,
+  BILLING_CURRENCY,
+  CURRENT_BASIC_PRICE,
+  PAYMENT_PROVIDER
+} from "./plan-config.js?v=20260605-analytics-reset";
 
 const isLocalhost = ["localhost", "127.0.0.1"].includes(window.location.hostname);
 const siteUrl = isLocalhost ? kindeConfig.localSiteUrl : kindeConfig.productionSiteUrl;
@@ -8,7 +14,8 @@ const dashboardPath = "/dashboard.html";
 const redirectStorageKey = "kbot_post_auth_redirect";
 const authIntentStorageKey = "kbot_auth_intent";
 const checkoutIntentStorageKey = "kbot_checkout_intent";
-const analyticsLoginStorageKey = "kbot_analytics_login_tracked";
+const authCompletedStorageKey = "kbot_auth_completed";
+const analyticsSignupStorageKey = "kbot_analytics_signup_tracked";
 
 let kindeClient;
 let currentAccount;
@@ -31,6 +38,7 @@ async function initAuth() {
     logout_uri: siteUrl,
     is_dangerously_use_local_storage: true,
     on_redirect_callback: function (_user, appState) {
+      storeAuthCompleted();
       const redirectTo = getStoredRedirect(appState?.redirectTo);
       if (redirectTo && window.location.pathname !== redirectTo) {
         redirectingAfterAuth = true;
@@ -111,6 +119,7 @@ async function startAuthFlow(type, element) {
 
   try {
     const checkoutPlan = normalizePlanKey(element?.getAttribute("data-checkout-plan"));
+    trackPaymentBasicClickOnce(element, checkoutPlan);
     const redirectTo = checkoutPlan
       ? checkoutRedirectPath(checkoutPlan)
       : normalizeRedirectPath(element?.getAttribute("data-redirect-to")) || dashboardPath;
@@ -221,6 +230,24 @@ function clearAuthIntent() {
   }
 }
 
+function storeAuthCompleted() {
+  try {
+    window.sessionStorage.setItem(authCompletedStorageKey, String(Date.now()));
+  } catch (_error) {
+    // Analytics should never affect auth callback handling.
+  }
+}
+
+function consumeAuthCompleted() {
+  try {
+    const completedAt = Number(window.sessionStorage.getItem(authCompletedStorageKey) || 0);
+    window.sessionStorage.removeItem(authCompletedStorageKey);
+    return completedAt > 0 && Date.now() - completedAt <= 10 * 60 * 1000;
+  } catch (_error) {
+    return false;
+  }
+}
+
 function storeCheckoutIntent(planKey) {
   try {
     window.localStorage.setItem(checkoutIntentStorageKey, JSON.stringify({
@@ -325,7 +352,9 @@ async function syncAuthenticatedUser() {
 
   try {
     const account = await apiFetch("/api/auth/sync-user", { method: "POST" });
-    pushLoginEventOnce(account);
+    if (consumeAuthCompleted()) {
+      trackSignupCompleteOnce(account);
+    }
   } catch (error) {
     console.error("Backend user sync failed:", error);
   }
@@ -515,10 +544,6 @@ function setPendingCheckoutPrompt(planKey, subscribeButton, statusElement) {
   }
 
   setText(statusElement, "Login complete. Tap the payment button to open Razorpay securely.");
-  pushCheckoutDiagnosticEvent("checkout_fallback_shown", {
-    plan_name: normalizedPlanKey,
-    price: normalizedPlanKey === "pro" ? 500 : 1
-  });
 }
 
 function clearCheckoutQueryParam() {
@@ -541,7 +566,6 @@ async function startCheckout(planKey, subscribeButton) {
       method: "POST",
       body: JSON.stringify({ plan: normalizedPlanKey })
     });
-    pushCheckoutDiagnosticEvent("checkout_open_attempt", planParams(data.plan));
     if (openRazorpayCheckout(data.checkout, subscribeButton, data.plan)) {
       setText(statusElement, "Checkout opened. Complete the Razorpay payment.");
       return { opened: true, retryable: false };
@@ -1285,7 +1309,7 @@ function openRazorpayCheckout(checkout, subscribeButton, plan) {
 
   try {
     razorpay.open();
-    pushBeginCheckoutEvent(plan);
+    trackPaymentPopupOpen(plan);
     return true;
   } catch (error) {
     console.error("Razorpay checkout could not open:", error);
@@ -1293,89 +1317,89 @@ function openRazorpayCheckout(checkout, subscribeButton, plan) {
     setText(errorElement, "Payment window could not open. Please tap the payment button again.");
     setButtonEnabled(subscribeButton, true);
     resetCheckoutButton(subscribeButton);
-    pushCheckoutDiagnosticEvent("checkout_open_failed", {
-      ...planParams(plan),
-      error_message: error?.message || "Razorpay open failed"
-    });
     return false;
   }
 }
 
 function pushPurchaseEvent(response, plan) {
-  const transactionId = response?.razorpay_payment_id;
+  if (normalizePlanName(plan?.name || plan?.display_name || BASIC_PLAN_NAME) !== BASIC_PLAN_NAME) return;
+
+  const transactionId = response?.razorpay_subscription_id || response?.razorpay_payment_id || response?.razorpay_order_id;
   if (!transactionId) return;
 
-  pushAnalyticsEvent("purchase", {
+  trackEvent("purchase", {
     transaction_id: transactionId,
-    value: Number(plan?.price_inr || 1),
-    currency: "INR",
-    plan_name: normalizePlanName(plan?.name || plan?.display_name || "basic")
+    plan_name: BASIC_PLAN_NAME,
+    value: CURRENT_BASIC_PRICE,
+    currency: BILLING_CURRENCY,
+    payment_provider: PAYMENT_PROVIDER
   });
 }
 
-function pushLoginEventOnce(account) {
+function trackSignupCompleteOnce(account) {
   const userId = account?.user?.id || account?.tenant?.id || "";
   const storageValue = userId || "current_session";
 
   try {
-    if (window.sessionStorage.getItem(analyticsLoginStorageKey) === storageValue) return;
-    window.sessionStorage.setItem(analyticsLoginStorageKey, storageValue);
+    if (window.sessionStorage.getItem(analyticsSignupStorageKey) === storageValue) return;
+    window.sessionStorage.setItem(analyticsSignupStorageKey, storageValue);
   } catch (_error) {
     // Analytics should never block auth when storage is unavailable.
   }
 
-  pushAnalyticsEvent("login", {
-    method: "kinde",
-    page_location: window.location.href
+  trackEvent("sign_up_complete", {
+    method: "kinde"
   });
 }
 
-function pushBeginCheckoutEvent(plan) {
-  pushAnalyticsEvent("begin_checkout", {
-    ...planParams(plan),
-    page_location: window.location.href
+function trackPaymentBasicClickOnce(element, planKey) {
+  if (planKey !== BASIC_PLAN_NAME || !element) return;
+  if (element.dataset.analyticsBasicClickTracked === "true") return;
+  element.dataset.analyticsBasicClickTracked = "true";
+
+  trackEvent("payment_basic_click", basicPlanParams());
+}
+
+function trackPaymentPopupOpen(plan) {
+  if (normalizePlanName(plan?.name || plan?.display_name || BASIC_PLAN_NAME) !== BASIC_PLAN_NAME) return;
+
+  trackEvent("payment_popup_open", {
+    ...basicPlanParams(),
+    payment_provider: PAYMENT_PROVIDER
   });
 }
 
-function pushCheckoutDiagnosticEvent(eventName, params = {}) {
-  pushAnalyticsEvent(eventName, {
-    ...params,
-    device_type: deviceType(),
-    user_agent: window.navigator.userAgent,
-    page_location: window.location.href
-  });
-}
-
-function pushAnalyticsEvent(eventName, params = {}) {
-  window.dataLayer = window.dataLayer || [];
-  window.dataLayer.push({
-    event: eventName,
-    ...params
-  });
-
+function trackEvent(eventName, params = {}) {
   if (typeof window.gtag === "function") {
-    window.gtag("event", eventName, params);
+    window.gtag("event", eventName, withDebugMode(params));
   }
+}
+
+function withDebugMode(params) {
+  if (!isAnalyticsDebugMode()) return params;
+
+  return {
+    ...params,
+    debug_mode: true
+  };
+}
+
+function isAnalyticsDebugMode() {
+  const searchParams = new URLSearchParams(window.location.search);
+  return ["1", "true"].includes(String(searchParams.get("debug_mode") || "").toLowerCase())
+    || searchParams.has("gtm_debug");
 }
 
 function normalizePlanName(value) {
   return String(value || "").trim().toLowerCase().includes("pro") ? "pro" : "basic";
 }
 
-function planParams(plan) {
-  const planName = normalizePlanName(plan?.name || plan?.display_name || "basic");
+function basicPlanParams() {
   return {
-    plan_name: planName,
-    price: Number(plan?.price_inr || (planName === "pro" ? 500 : 1)),
-    currency: "INR"
+    plan_name: BASIC_PLAN_NAME,
+    price: CURRENT_BASIC_PRICE,
+    currency: BILLING_CURRENCY
   };
-}
-
-function deviceType() {
-  const userAgent = window.navigator.userAgent || "";
-  if (/ipad|tablet/i.test(userAgent)) return "tablet";
-  if (/mobi|android|iphone|ipod/i.test(userAgent)) return "mobile";
-  return "desktop";
 }
 
 function setText(element, value) {
