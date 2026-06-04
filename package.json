@@ -5,9 +5,9 @@
   "type": "module",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js",
-    "backend": "node backend/src/server.js",
-    "backend:dev": "node backend/src/server.js",
+    "start": "node --import ./backend/src/monitoring/sentry.js server.js",
+    "backend": "node --import ./backend/src/monitoring/sentry.js backend/src/server.js",
+    "backend:dev": "node --import ./backend/src/monitoring/sentry.js backend/src/server.js",
     "db:migrate": "node backend/db/migrate.js",
     "test:pdf-ingestion": "node backend/scripts/test-pdf-ingestion.mjs",
     "dev": "node serve.mjs",
@@ -16,6 +16,7 @@
   "dependencies": {
     "@kinde-oss/kinde-auth-pkce-js": "^4.3.0",
     "@napi-rs/canvas": "^1.0.0",
+    "@sentry/node": "^10.56.0",
     "@supabase/supabase-js": "^2.105.4",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",

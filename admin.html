@@ -3,6 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- Sentry SDK loads early so runtime errors and unhandled rejections can be reported. -->
+  <script src="https://browser.sentry-cdn.com/10.42.0/bundle.min.js" integrity="sha384-L/HYBH2QCeLyXhcZ0hPTxWMnyMJburPJyVoBmRk4OoilqrOWq5kU4PNTLFYrCYPr" crossorigin="anonymous"></script>
+  <!-- Monitoring initializes Sentry and Microsoft Clarity. Update IDs in /assets/js/monitoring.js. -->
+  <script src="/assets/js/monitoring.js"></script>
   <title>Admin Operations | Custom AI Chatbot</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">

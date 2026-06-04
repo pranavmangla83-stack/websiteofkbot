@@ -1,3 +1,4 @@
+import { Sentry } from "./monitoring/sentry.js";
 import cors from "cors";
 import express from "express";
 import rateLimit from "express-rate-limit";
@@ -93,6 +94,12 @@ app.get("/api/health", (req, res) => {
   });
 });
 
+if (process.env.NODE_ENV !== "production") {
+  app.get("/api/debug-sentry", () => {
+    throw new Error("Backend Sentry debug error");
+  });
+}
+
 app.use("/api/auth", adminCors, authenticatedApiLimiter, authRouter);
 app.use("/api/me", adminCors, authenticatedApiLimiter, meRouter);
 app.use("/api/admin", adminCors, authenticatedApiLimiter, adminRouter);
@@ -133,6 +140,7 @@ app.get(Array.from(frontendRoutes.keys()), (req, res) => {
 });
 
 app.use(notFound);
+Sentry.setupExpressErrorHandler(app);
 app.use(errorHandler);
 
 function adminOrigins(frontendUrl) {
