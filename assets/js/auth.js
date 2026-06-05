@@ -289,7 +289,9 @@ function normalizePlanKey(value) {
 }
 
 function checkoutRedirectPath(planKey) {
-  return `${dashboardPath}?checkout=${encodeURIComponent(planKey)}`;
+  const params = new URLSearchParams({ checkout: planKey });
+  if (isAnalyticsDebugMode()) params.set("debug_mode", "true");
+  return `${dashboardPath}?${params.toString()}`;
 }
 
 function currentPathWithSearch() {
