@@ -20,6 +20,7 @@
   var history = loadHistory(historyKey);
   var lastQuestion = "";
   var lastChatSessionId = "";
+  var firstMessageTrackedKey = storagePrefix + "first_message_tracked";
 
   function start() {
     var host = document.createElement("div");
@@ -131,6 +132,7 @@
     hideLeadForm(ui.leadForm);
     setDisabled(ui, true);
     addHistoryMessage("user", text, ui.messages);
+    trackCustomerMessageEvents();
     var pending = addMessage(ui.messages, "bot", "Typing...", true);
 
     try {
@@ -141,7 +143,8 @@
           client_id: clientId,
           chatbot_key: chatbotKey,
           message: text,
-          session_id: sessionId
+          session_id: sessionId,
+          source_url: window.location.href
         })
       });
       var data = await response.json().catch(function () { return {}; });
@@ -249,6 +252,29 @@
   function setDisabled(ui, disabled) {
     ui.input.disabled = disabled;
     ui.send.disabled = disabled;
+  }
+
+  function trackCustomerMessageEvents() {
+    trackEvent("customer_chat_message_sent", {
+      source: "customer",
+      demo: false
+    });
+
+    try {
+      if (window.localStorage.getItem(firstMessageTrackedKey) !== "true") {
+        trackEvent("customer_first_chat_message", {
+          source: "customer",
+          demo: false
+        });
+        window.localStorage.setItem(firstMessageTrackedKey, "true");
+      }
+    } catch (_error) {}
+  }
+
+  function trackEvent(eventName, params) {
+    if (typeof window.gtag === "function") {
+      window.gtag("event", eventName, params || {});
+    }
   }
 
   function getOrCreateSession(key) {

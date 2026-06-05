@@ -2,11 +2,14 @@ import http from "node:http";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import dotenv from "dotenv";
+
+dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const host = process.env.HOST || "127.0.0.1";
-const port = Number(process.env.PORT || 3000);
+const port = Number(process.env.STATIC_PORT || 3000);
 
 const mimeTypes = {
   ".html": "text/html; charset=utf-8",
@@ -21,7 +24,18 @@ const mimeTypes = {
 };
 
 const server = http.createServer((req, res) => {
-  serveStaticFile(res, decodeURIComponent(req.url || "/"));
+  const pathname = safeDecodePath(req.url || "/");
+
+  if (pathname === "/api/monitoring-config") {
+    sendJson(res, {
+      sentryFrontendDsn: process.env.SENTRY_FRONTEND_DSN?.trim() || "",
+      clarityProjectId: process.env.CLARITY_PROJECT_ID?.trim() || "",
+      environment: process.env.NODE_ENV || "development"
+    });
+    return;
+  }
+
+  serveStaticFile(res, pathname);
 });
 
 server.listen(port, host, () => {
@@ -59,4 +73,21 @@ function sendFile(res, filePath) {
   const type = mimeTypes[ext] || "application/octet-stream";
   res.writeHead(200, { "Content-Type": type });
   fs.createReadStream(filePath).pipe(res);
+}
+
+function sendJson(res, body) {
+  res.writeHead(200, {
+    "Content-Type": "application/json; charset=utf-8",
+    "Cache-Control": "no-store"
+  });
+  res.end(JSON.stringify(body));
+}
+
+function safeDecodePath(url) {
+  const rawPath = String(url).split("?")[0].split("#")[0] || "/";
+  try {
+    return decodeURIComponent(rawPath);
+  } catch (_error) {
+    return rawPath;
+  }
 }

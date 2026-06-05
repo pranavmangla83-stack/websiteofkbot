@@ -94,11 +94,13 @@ app.get("/api/health", (req, res) => {
   });
 });
 
-if (process.env.NODE_ENV !== "production") {
-  app.get("/api/debug-sentry", () => {
-    throw new Error("Backend Sentry debug error");
+app.get("/api/monitoring-config", (_req, res) => {
+  res.json({
+    sentryFrontendDsn: env.sentryFrontendDsn || "",
+    clarityProjectId: env.clarityProjectId || "",
+    environment: process.env.NODE_ENV || "development"
   });
-}
+});
 
 app.use("/api/auth", adminCors, authenticatedApiLimiter, authRouter);
 app.use("/api/me", adminCors, authenticatedApiLimiter, meRouter);

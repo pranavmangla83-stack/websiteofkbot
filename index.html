@@ -3,17 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <!-- Sentry SDK loads early so runtime errors and unhandled rejections can be reported. -->
-  <script src="https://browser.sentry-cdn.com/10.42.0/bundle.min.js" integrity="sha384-L/HYBH2QCeLyXhcZ0hPTxWMnyMJburPJyVoBmRk4OoilqrOWq5kU4PNTLFYrCYPr" crossorigin="anonymous"></script>
-  <!-- Monitoring initializes Sentry and Microsoft Clarity. Update IDs in /assets/js/monitoring.js. -->
-  <script src="/assets/js/monitoring.js"></script>
-  <!-- Google Tag Manager -->
-  <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
-  new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
-  j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
-  'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
-  })(window,document,'script','dataLayer','GTM-K9DVLRL2');</script>
-  <!-- End Google Tag Manager -->
+  <script defer src="/assets/js/monitoring.js?v=20260606-lcp"></script>
   <title>AI Chatbot for Your Website Trained on Business Documents</title>
   <meta
     name="description"
@@ -39,49 +29,21 @@
     name="twitter:description"
     content="A simple AI website chatbot for Indian small businesses, trained on uploaded business documents."
   >
-  <script async src="https://www.googletagmanager.com/gtag/js?id=G-N6M9HCLHBG"></script>
   <script>
     window.dataLayer = window.dataLayer || [];
     function gtag(){dataLayer.push(arguments);}
-    gtag("js", new Date());
-    gtag("config", "G-N6M9HCLHBG");
   </script>
-  <script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token": "fd7c17cbde564ad397950ef13c3d2d55"}'></script>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link
-    href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Space+Grotesk:wght@500;700&display=swap"
-    rel="stylesheet"
-  >
-  <script>
-    tailwind.config = {
-      theme: {
-        extend: {
-          colors: {
-            ink: "#111827",
-            paper: "#fffaf5",
-            line: "#e7ddd2",
-            brand: "#c96f4a",
-            brandDeep: "#8e4427",
-            green: "#2f5f50"
-          },
-          boxShadow: {
-            soft: "0 14px 40px rgba(17, 24, 39, 0.10)"
-          }
-        }
-      }
-    };
-  </script>
+  <link rel="preload" href="/assets/css/site.css?v=20260606-lcp" as="style">
+  <link rel="stylesheet" href="/assets/css/site.css?v=20260606-lcp">
   <style>
     body {
-      font-family: "DM Sans", sans-serif;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       background: #fffaf5;
       color: #111827;
     }
 
     h1, h2, h3 {
-      font-family: "Space Grotesk", sans-serif;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       letter-spacing: 0;
     }
   </style>
@@ -104,11 +66,6 @@
   </script>
 </head>
 <body id="top" class="min-h-screen">
-  <!-- Google Tag Manager (noscript) -->
-  <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-K9DVLRL2"
-  height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
-  <!-- End Google Tag Manager (noscript) -->
-
   <header class="border-b border-line bg-paper/95">
     <div class="mx-auto flex max-w-6xl items-center justify-between gap-4 px-5 py-4 md:px-8">
       <a href="#top" class="flex items-center gap-3">
@@ -202,6 +159,98 @@
           </div>
           <div class="rounded-lg border border-white/10 bg-white/5 p-4 text-sm text-white/70">
             If the chatbot does not know an answer, it does not guess. It asks for contact details or points visitors to support.
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="live-demo" class="border-b border-line bg-paper">
+      <div class="mx-auto max-w-6xl px-5 py-12 md:px-8 md:py-16">
+        <div class="grid gap-8 lg:grid-cols-[0.9fr_1.1fr] lg:items-start">
+          <div>
+            <p class="text-sm font-bold uppercase tracking-wide text-brandDeep">Try Live Demo</p>
+            <h2 class="mt-2 text-3xl font-bold md:text-4xl">Try a chatbot on your website</h2>
+            <p class="mt-4 leading-8 text-ink/70">
+              No signup required. No payment required. Enter your website URL and the demo will read up to 3 public pages so you can ask a few questions.
+            </p>
+            <form id="demo-crawl-form" class="mt-6 rounded-lg border border-line bg-white p-5">
+              <label for="demo-website-url" class="block text-sm font-bold text-ink">Website URL</label>
+              <div class="mt-3 flex flex-col gap-3 sm:flex-row">
+                <input
+                  id="demo-website-url"
+                  type="url"
+                  required
+                  placeholder="https://yourwebsite.com"
+                  class="min-w-0 flex-1 rounded-lg border border-line bg-paper px-4 py-3 text-sm text-ink outline-none focus:border-brand"
+                >
+                <button type="submit" class="rounded-lg bg-ink px-5 py-3 text-sm font-bold text-white hover:bg-brandDeep">
+                  Crawl 3 Pages
+                </button>
+              </div>
+              <p id="demo-crawl-status" class="mt-3 min-h-6 text-sm font-semibold text-ink/70" aria-live="polite">
+                Public http/https websites only. Localhost, private IPs, and internal URLs are blocked.
+              </p>
+            </form>
+            <div class="mt-6 rounded-lg border border-line bg-white p-5">
+              <label for="demo-pdf-upload" class="block text-sm font-bold text-ink">Demo PDF upload check</label>
+              <p class="mt-2 text-sm leading-6 text-ink/65">You can test the upload rule here before starting Basic.</p>
+              <input
+                id="demo-pdf-upload"
+                type="file"
+                accept="application/pdf,.pdf"
+                multiple
+                class="mt-4 block w-full rounded-lg border border-line bg-paper px-3 py-3 text-sm text-ink file:mr-4 file:rounded-lg file:border-0 file:bg-ink file:px-4 file:py-2 file:text-sm file:font-bold file:text-white hover:file:bg-brandDeep"
+              >
+              <p id="demo-upload-status" class="mt-3 min-h-6 text-sm font-semibold text-ink/70" aria-live="polite">
+                Demo limit: one PDF, maximum 10 MB.
+              </p>
+            </div>
+          </div>
+
+          <div class="rounded-xl border border-line bg-white shadow-soft">
+            <div class="flex items-center justify-between border-b border-line px-5 py-4">
+              <div>
+                <p class="text-xs font-bold uppercase tracking-wide text-brandDeep">Demo knowledge base</p>
+                <h3 id="demo-knowledge-title" class="mt-1 text-xl font-bold">Enter a website URL</h3>
+              </div>
+              <span id="demo-message-count" class="rounded-lg bg-paper px-3 py-1 text-xs font-bold text-ink/70">0/5 messages</span>
+            </div>
+
+            <div id="demo-chat-log" class="h-[360px] space-y-4 overflow-y-auto px-5 py-5 text-sm leading-6" aria-live="polite">
+              <div class="max-w-[86%] rounded-lg bg-paper px-4 py-3 text-ink/75">
+                Enter a public website URL first. I will crawl up to 3 pages, then you can ask 5 demo questions.
+              </div>
+            </div>
+
+            <div id="demo-limit-panel" class="hidden border-t border-line bg-paper px-5 py-5">
+              <h3 class="text-xl font-bold">Want your own chatbot?</h3>
+              <p class="mt-2 leading-7 text-ink/70">Upload your own PDFs and create a chatbot in minutes.</p>
+              <a
+                id="demo-start-basic-btn"
+                href="/dashboard.html"
+                data-kinde-register
+                data-redirect-to="/dashboard.html"
+                data-checkout-plan="basic"
+                class="mt-4 inline-flex rounded-lg bg-brand px-6 py-3 text-sm font-bold text-white hover:bg-brandDeep"
+              >
+                Start Basic
+              </a>
+            </div>
+
+            <form id="demo-chat-form" class="flex gap-3 border-t border-line p-4">
+              <input
+                id="demo-chat-input"
+                type="text"
+                autocomplete="off"
+                maxlength="180"
+                placeholder="Crawl a website first..."
+                disabled
+                class="min-w-0 flex-1 rounded-lg border border-line bg-paper px-4 py-3 text-sm text-ink outline-none focus:border-brand"
+              >
+              <button type="submit" disabled class="rounded-lg bg-ink px-5 py-3 text-sm font-bold text-white hover:bg-brandDeep disabled:cursor-not-allowed disabled:opacity-60">
+                Send
+              </button>
+            </form>
           </div>
         </div>
       </div>
@@ -438,7 +487,344 @@
     </div>
   </footer>
 
-  <script type="module" src="/assets/js/auth.js?v=20260605-analytics-reset"></script>
-  <script src="https://customaichatbot.online/widget.js" data-client-id="ff9b7b19-d806-48d9-9e89-1be2a9901630" data-chatbot-key="07dcecc5d2abcf89515cdfb0f7fb4aad9d2d"></script>
+  <script>
+    (function () {
+      const maxDemoMessages = 5;
+      const maxDemoPdfBytes = 10 * 1024 * 1024;
+      const countStorageKey = "kbot_demo_message_count";
+      const limitStorageKey = "kbot_demo_limit_tracked";
+      const sessionStorageKey = "kbot_demo_session_id";
+      const section = document.getElementById("live-demo");
+      const chatLog = document.getElementById("demo-chat-log");
+      const crawlForm = document.getElementById("demo-crawl-form");
+      const websiteUrlInput = document.getElementById("demo-website-url");
+      const crawlStatus = document.getElementById("demo-crawl-status");
+      const knowledgeTitle = document.getElementById("demo-knowledge-title");
+      const form = document.getElementById("demo-chat-form");
+      const input = document.getElementById("demo-chat-input");
+      const countLabel = document.getElementById("demo-message-count");
+      const limitPanel = document.getElementById("demo-limit-panel");
+      const startBasicButton = document.getElementById("demo-start-basic-btn");
+      const uploadInput = document.getElementById("demo-pdf-upload");
+      const uploadStatus = document.getElementById("demo-upload-status");
+
+      if (!section || !chatLog || !form || !input || !countLabel || !limitPanel) return;
+
+      function trackDemoEvent(eventName, params) {
+        if (typeof window.gtag === "function") {
+          window.gtag("event", eventName, params || {});
+        }
+      }
+
+      function getMessageCount() {
+        const storedCount = Number.parseInt(window.localStorage.getItem(countStorageKey) || "0", 10);
+        if (Number.isNaN(storedCount) || storedCount < 0) return 0;
+        return Math.min(storedCount, maxDemoMessages);
+      }
+
+      function setMessageCount(count) {
+        window.localStorage.setItem(countStorageKey, String(Math.min(count, maxDemoMessages)));
+      }
+
+      function resetDemoMessageLimit() {
+        window.localStorage.setItem(countStorageKey, "0");
+        window.localStorage.removeItem(limitStorageKey);
+        countLabel.textContent = "0/" + maxDemoMessages + " messages";
+        limitPanel.classList.add("hidden");
+      }
+
+      function getOrCreateDemoSessionId() {
+        try {
+          const existing = window.localStorage.getItem(sessionStorageKey);
+          if (existing) return existing;
+          const next = window.crypto && window.crypto.randomUUID
+            ? window.crypto.randomUUID()
+            : String(Date.now()) + "-" + Math.random().toString(16).slice(2);
+          window.localStorage.setItem(sessionStorageKey, next);
+          return next;
+        } catch (_error) {
+          return String(Date.now()) + "-" + Math.random().toString(16).slice(2);
+        }
+      }
+
+      function createNewDemoSessionId() {
+        const next = window.crypto && window.crypto.randomUUID
+          ? window.crypto.randomUUID()
+          : String(Date.now()) + "-" + Math.random().toString(16).slice(2);
+        try {
+          window.localStorage.setItem(sessionStorageKey, next);
+        } catch (_error) {}
+        return next;
+      }
+
+      function updateLimitState() {
+        const count = getMessageCount();
+        countLabel.textContent = count + "/" + maxDemoMessages + " messages";
+        if (count >= maxDemoMessages) {
+          input.disabled = true;
+          input.placeholder = "Demo message limit reached";
+          form.querySelector("button").disabled = true;
+          form.querySelector("button").classList.add("cursor-not-allowed", "opacity-60");
+          limitPanel.classList.remove("hidden");
+        }
+      }
+
+      function setChatEnabled(enabled) {
+        input.disabled = !enabled;
+        form.querySelector("button").disabled = !enabled;
+        if (enabled) {
+          input.placeholder = "Ask about this website...";
+          form.querySelector("button").classList.remove("cursor-not-allowed", "opacity-60");
+        } else {
+          input.placeholder = "Crawl a website first...";
+          form.querySelector("button").classList.add("cursor-not-allowed", "opacity-60");
+        }
+      }
+
+      function appendMessage(text, sender) {
+        const message = document.createElement("div");
+        const isBot = sender === "bot";
+        message.className = isBot
+          ? "max-w-[86%] rounded-lg bg-paper px-4 py-3 text-ink/75"
+          : "ml-auto max-w-[86%] rounded-lg bg-brand px-4 py-3 text-white";
+        message.textContent = text;
+        chatLog.appendChild(message);
+        chatLog.scrollTop = chatLog.scrollHeight;
+      }
+
+      function markLimitReached() {
+        if (window.localStorage.getItem(limitStorageKey) !== "true") {
+          trackDemoEvent("demo_limit_reached", { message_limit: maxDemoMessages });
+          window.localStorage.setItem(limitStorageKey, "true");
+        }
+        appendMessage("Want your own chatbot? Upload your own PDFs and create a chatbot in minutes.", "bot");
+        updateLimitState();
+      }
+
+      function demoVisitorMetadata() {
+        const params = new URLSearchParams(window.location.search);
+        return {
+          page: "homepage",
+          source: "demo_chat",
+          device: window.matchMedia("(max-width: 767px)").matches ? "mobile" : "desktop",
+          referrer: document.referrer || "",
+          utm_source: params.get("utm_source") || "",
+          utm_campaign: params.get("utm_campaign") || "",
+          utm_term: params.get("utm_term") || ""
+        };
+      }
+
+      async function sendDemoQuestion(question) {
+        const response = await fetch("/api/chat/demo", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            message: question,
+            session_id: getOrCreateDemoSessionId(),
+            visitor_metadata: demoVisitorMetadata()
+          })
+        });
+        const data = await response.json().catch(function () { return {}; });
+        if (!response.ok) {
+          const error = new Error(data.error || "Demo chat is temporarily unavailable. Please try again.");
+          error.data = data;
+          throw error;
+        }
+        return data;
+      }
+
+      async function crawlDemoWebsite(websiteUrl) {
+        const sessionId = createNewDemoSessionId();
+        const response = await fetch("/api/chat/demo/crawl", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            website_url: websiteUrl,
+            session_id: sessionId,
+            visitor_metadata: demoVisitorMetadata()
+          })
+        });
+        const data = await response.json().catch(function () { return {}; });
+        if (!response.ok) {
+          const error = new Error(data.error || "Could not crawl this website.");
+          error.data = data;
+          throw error;
+        }
+        return data;
+      }
+
+      if ("IntersectionObserver" in window) {
+        const observer = new IntersectionObserver(function (entries) {
+          if (entries.some(function (entry) { return entry.isIntersecting; })) {
+            trackDemoEvent("demo_chat_open", { source: "homepage_live_demo" });
+            observer.disconnect();
+          }
+        }, { threshold: 0.35 });
+        observer.observe(section);
+      } else {
+        trackDemoEvent("demo_chat_open", { source: "homepage_live_demo" });
+      }
+
+      if (uploadInput && uploadStatus) {
+        uploadInput.addEventListener("change", function () {
+          const files = Array.from(uploadInput.files || []);
+          if (files.length > 1) {
+            uploadStatus.textContent = "In demo, you can upload one PDF of 10 MB only.";
+            uploadStatus.className = "mt-3 min-h-6 text-sm font-semibold text-red-700";
+            uploadInput.value = "";
+            return;
+          }
+          if (files[0] && files[0].size > maxDemoPdfBytes) {
+            uploadStatus.textContent = "In demo, you can upload one PDF of 10 MB only.";
+            uploadStatus.className = "mt-3 min-h-6 text-sm font-semibold text-red-700";
+            uploadInput.value = "";
+            return;
+          }
+          if (files[0] && files[0].type !== "application/pdf" && !files[0].name.toLowerCase().endsWith(".pdf")) {
+            uploadStatus.textContent = "Please choose a PDF file for this demo.";
+            uploadStatus.className = "mt-3 min-h-6 text-sm font-semibold text-red-700";
+            uploadInput.value = "";
+            return;
+          }
+          uploadStatus.textContent = files[0] ? "PDF accepted for demo check. The live chatbot answers from your submitted website URL." : "Demo limit: one PDF, maximum 10 MB.";
+          uploadStatus.className = "mt-3 min-h-6 text-sm font-semibold text-green";
+        });
+      }
+
+      if (crawlForm && websiteUrlInput && crawlStatus) {
+        crawlForm.addEventListener("submit", async function (event) {
+          event.preventDefault();
+          const websiteUrl = websiteUrlInput.value.trim();
+          if (!websiteUrl) return;
+
+          const button = crawlForm.querySelector("button[type='submit']");
+          button.disabled = true;
+          setChatEnabled(false);
+          crawlStatus.textContent = "Crawling up to 3 public pages...";
+          crawlStatus.className = "mt-3 min-h-6 text-sm font-semibold text-ink/70";
+          trackDemoEvent("demo_url_submitted", { source: "homepage_live_demo" });
+
+          try {
+            const data = await crawlDemoWebsite(websiteUrl);
+            resetDemoMessageLimit();
+            setChatEnabled(true);
+            if (knowledgeTitle) knowledgeTitle.textContent = new URL(data.website_url).hostname;
+            appendMessage("I crawled " + (data.indexed_pages || 0) + " page(s) from " + data.website_url + ". Ask me about this website.", "bot");
+            crawlStatus.textContent = "Crawl complete. You can ask 5 demo questions.";
+            crawlStatus.className = "mt-3 min-h-6 text-sm font-semibold text-green";
+            trackDemoEvent("demo_crawl_success", {
+              source: "homepage_live_demo",
+              indexed_pages: data.indexed_pages || 0
+            });
+            input.focus();
+          } catch (error) {
+            crawlStatus.textContent = error.message || "Could not crawl this website.";
+            crawlStatus.className = "mt-3 min-h-6 text-sm font-semibold text-red-700";
+            appendMessage(error.message || "Could not crawl this website. Try a public http or https website.", "bot");
+            trackDemoEvent("demo_crawl_failed", {
+              source: "homepage_live_demo"
+            });
+          } finally {
+            button.disabled = false;
+          }
+        });
+      }
+
+      if (startBasicButton) {
+        startBasicButton.addEventListener("click", function () {
+          trackDemoEvent("demo_start_basic_click", {
+            source: "homepage_live_demo"
+          });
+        });
+      }
+
+      form.addEventListener("submit", async function (event) {
+        event.preventDefault();
+        if (input.disabled) return;
+        const currentCount = getMessageCount();
+        if (currentCount >= maxDemoMessages) {
+          updateLimitState();
+          return;
+        }
+
+        const question = input.value.trim();
+        if (!question) return;
+
+        appendMessage(question, "user");
+        input.value = "";
+        input.disabled = true;
+        form.querySelector("button").disabled = true;
+        trackDemoEvent("demo_question_sent", {
+          question_number: currentCount + 1,
+          message_limit: maxDemoMessages
+        });
+
+        try {
+          const data = await sendDemoQuestion(question);
+          appendMessage(data.answer || "I found related information in the sample PDF.", "bot");
+          const nextCount = Number(data.message_count || currentCount + 1);
+          setMessageCount(nextCount);
+          updateLimitState();
+          if (data.limit_reached || nextCount >= maxDemoMessages) markLimitReached();
+        } catch (error) {
+          const data = error.data || {};
+          if (data.limit_reached) {
+            setMessageCount(maxDemoMessages);
+            markLimitReached();
+          } else {
+            appendMessage(error.message || "Demo chat is temporarily unavailable. Please try again.", "bot");
+          }
+        } finally {
+          if (getMessageCount() < maxDemoMessages) {
+            setChatEnabled(true);
+            input.focus();
+          }
+        }
+      });
+
+      setChatEnabled(false);
+      updateLimitState();
+    })();
+  </script>
+  <script>
+    (function () {
+      function afterFirstPaint(callback) {
+        const run = function () {
+          if ("requestIdleCallback" in window) {
+            window.requestIdleCallback(callback, { timeout: 2500 });
+          } else {
+            window.setTimeout(callback, 1200);
+          }
+        };
+
+        if (document.readyState === "complete") run();
+        else window.addEventListener("load", run, { once: true });
+      }
+
+      function loadScript(src, attrs) {
+        const script = document.createElement("script");
+        script.src = src;
+        script.async = true;
+        Object.keys(attrs || {}).forEach(function (key) {
+          script.setAttribute(key, attrs[key]);
+        });
+        document.head.appendChild(script);
+      }
+
+      afterFirstPaint(function () {
+        gtag("js", new Date());
+        gtag("config", "G-N6M9HCLHBG");
+        loadScript("https://www.googletagmanager.com/gtag/js?id=G-N6M9HCLHBG");
+        loadScript("https://static.cloudflareinsights.com/beacon.min.js", {
+          "data-cf-beacon": '{"token": "fd7c17cbde564ad397950ef13c3d2d55"}'
+        });
+        loadScript("/assets/js/auth.js?v=20260606-lcp", { type: "module" });
+        loadScript("https://customaichatbot.online/widget.js", {
+          "data-client-id": "ff9b7b19-d806-48d9-9e89-1be2a9901630",
+          "data-chatbot-key": "07dcecc5d2abcf89515cdfb0f7fb4aad9d2d"
+        });
+      });
+    })();
+  </script>
 </body>
 </html>

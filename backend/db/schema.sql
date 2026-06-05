@@ -217,11 +217,17 @@ CREATE TABLE IF NOT EXISTS public.chat_sessions (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   client_id uuid NOT NULL REFERENCES public.clients(id) ON DELETE CASCADE,
   chatbot_id uuid NOT NULL REFERENCES public.chatbots(id) ON DELETE CASCADE,
+  session_type text NOT NULL DEFAULT 'customer' CHECK (session_type IN ('demo', 'customer')),
   visitor_id text NOT NULL,
   visitor_metadata jsonb NOT NULL DEFAULT '{}'::jsonb,
   started_at timestamptz NOT NULL DEFAULT now(),
   last_message_at timestamptz
 );
+
+ALTER TABLE public.chat_sessions ADD COLUMN IF NOT EXISTS session_type text NOT NULL DEFAULT 'customer';
+UPDATE public.chat_sessions SET session_type = 'customer' WHERE session_type IS NULL;
+ALTER TABLE public.chat_sessions DROP CONSTRAINT IF EXISTS chat_sessions_session_type_check;
+ALTER TABLE public.chat_sessions ADD CONSTRAINT chat_sessions_session_type_check CHECK (session_type IN ('demo', 'customer'));
 
 CREATE TABLE IF NOT EXISTS public.messages (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -278,6 +284,7 @@ CREATE INDEX IF NOT EXISTS website_pages_status_idx ON public.website_pages(stat
 CREATE INDEX IF NOT EXISTS document_chunks_embedding_hnsw_idx
   ON public.document_chunks USING hnsw (embedding vector_cosine_ops);
 CREATE INDEX IF NOT EXISTS chat_sessions_chatbot_id_idx ON public.chat_sessions(chatbot_id);
+CREATE INDEX IF NOT EXISTS chat_sessions_session_type_started_idx ON public.chat_sessions(session_type, started_at DESC);
 CREATE INDEX IF NOT EXISTS messages_session_id_idx ON public.messages(session_id);
 CREATE INDEX IF NOT EXISTS messages_client_chatbot_created_idx ON public.messages(client_id, chatbot_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS chat_leads_client_created_idx ON public.chat_leads(client_id, created_at DESC);

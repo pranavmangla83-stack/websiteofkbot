@@ -22,6 +22,7 @@ let currentAccount;
 let currentBilling;
 let redirectingAfterAuth = false;
 let authFlowStarting = false;
+let adminChatFilters = { chatType: "all", timeRange: "all" };
 
 initAuth();
 
@@ -446,6 +447,20 @@ document.addEventListener("click", async function (event) {
     return;
   }
 
+  const adminChatFilter = event.target.closest("[data-admin-chat-filter]");
+  if (adminChatFilter) {
+    event.preventDefault();
+    const chatType = adminChatFilter.getAttribute("data-chat-type");
+    const timeRange = adminChatFilter.getAttribute("data-time-range");
+    if (chatType) adminChatFilters.chatType = chatType;
+    if (timeRange) adminChatFilters.timeRange = timeRange;
+    if (chatType === "all" && !timeRange) {
+      adminChatFilters = { chatType: "all", timeRange: "all" };
+    }
+    await renderAdminState();
+    return;
+  }
+
   const adminRetryStuck = event.target.closest("[data-admin-retry-stuck]");
   if (adminRetryStuck) {
     event.preventDefault();
@@ -645,6 +660,10 @@ document.addEventListener("submit", async function (event) {
     await apiFetch("/api/documents/upload", {
       method: "POST",
       body
+    });
+    trackEvent("pdf_upload_success", {
+      source: "customer",
+      demo: false
     });
     input.value = "";
     setText(statusElement, "PDF uploaded. Processing has started.");
@@ -1001,7 +1020,11 @@ async function renderAdminState() {
   setText(statusElement, "Loading admin data...");
 
   try {
-    const data = await apiFetch("/api/admin/overview");
+    const query = new URLSearchParams({
+      chat_type: adminChatFilters.chatType,
+      time_range: adminChatFilters.timeRange
+    });
+    const data = await apiFetch(`/api/admin/overview?${query.toString()}`);
     const summary = data.summary || {};
 
     if (summaryElement) {
@@ -1010,10 +1033,32 @@ async function renderAdminState() {
         summaryCard("Active subscriptions", summary.active_subscriptions),
         summaryCard("PDFs", summary.documents),
         summaryCard("Failed PDFs", summary.failed_documents),
-        summaryCard("Leads", summary.leads)
+        summaryCard("Leads", summary.leads),
+        summaryCard("Demo chats", summary.demo_chat_sessions),
+        summaryCard("Demo messages", summary.demo_chat_messages),
+        summaryCard("Customer chats", summary.customer_chat_sessions),
+        summaryCard("Customer messages", summary.customer_chat_messages)
       ].join("");
     }
 
+    renderAdminChats(data.demo_chat_sessions || [], data.customer_chat_sessions || [], data.chat_filters || adminChatFilters);
+    renderAdminTable("demo_website_pages", "Demo Website Crawl Pages", data.demo_website_pages || [], [
+      ["updated_at", "Updated"],
+      ["client_id", "Client ID"],
+      ["chatbot_id", "Chatbot ID"],
+      ["url", "Website URL"],
+      ["status", "Status"],
+      ["error_message", "Error"]
+    ]);
+    renderAdminTable("customer_website_pages", "Customer Website Crawl Pages", data.customer_website_pages || [], [
+      ["updated_at", "Updated"],
+      ["client_id", "Client ID"],
+      ["chatbot_id", "Chatbot ID"],
+      ["client_email", "Client"],
+      ["url", "Website URL"],
+      ["status", "Status"],
+      ["error_message", "Error"]
+    ]);
     renderAdminTable("leads", "Fallback leads", data.leads || [], [
       ["created_at", "Created"],
       ["client_email", "Client"],
@@ -1071,6 +1116,118 @@ function summaryCard(label, value) {
   `;
 }
 
+function renderAdminChats(demoRows, customerRows, filters) {
+  const host = document.querySelector("[data-admin-chats]");
+  if (!host) return;
+
+  host.innerHTML = `
+    <div class="grid gap-4">
+      <section class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+        <div class="flex flex-wrap gap-2">
+          ${adminFilterButton("All", "all", "", filters)}
+          ${adminFilterButton("Demo only", "demo", "", filters)}
+          ${adminFilterButton("Customer only", "customer", "", filters)}
+          ${adminFilterButton("Last 24 hours", "", "24h", filters)}
+          ${adminFilterButton("Last 7 days", "", "7d", filters)}
+        </div>
+      </section>
+      ${renderAdminChatSection("Demo Chat Sessions", demoRows, "demo")}
+      ${renderAdminChatSection("Customer Chat Sessions", customerRows, "customer")}
+    </div>
+  `;
+}
+
+function adminFilterButton(label, chatType, timeRange, filters) {
+  const active = chatType
+    ? (filters.chat_type || filters.chatType) === chatType && (chatType !== "all" || (filters.time_range || filters.timeRange) === "all")
+    : (filters.time_range || filters.timeRange) === timeRange;
+  return `
+    <button
+      type="button"
+      data-admin-chat-filter
+      ${chatType ? `data-chat-type="${escapeAttr(chatType)}"` : ""}
+      ${timeRange ? `data-time-range="${escapeAttr(timeRange)}"` : ""}
+      class="rounded-lg ${active ? "bg-[#c96f4a] text-white" : "border border-slate-200 bg-white text-slate-900"} px-4 py-2 text-sm font-bold"
+    >
+      ${escapeHtml(label)}
+    </button>
+  `;
+}
+
+function renderAdminChatSection(title, rows, type) {
+  const body = rows.length
+    ? rows.map(function (row) {
+        return renderAdminChatRow(row, type);
+      }).join("")
+    : `<p class="border-t border-slate-100 px-4 py-4 text-sm text-slate-500">No ${type} chat sessions found.</p>`;
+
+  return `
+    <section class="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+      <div class="border-b border-slate-200 px-4 py-3">
+        <h2 class="font-bold text-slate-900">${escapeHtml(title)}</h2>
+      </div>
+      ${body}
+    </section>
+  `;
+}
+
+function renderAdminChatRow(row, type) {
+  const metadata = row.visitor_metadata || {};
+  const transcript = Array.isArray(row.transcript) ? row.transcript : [];
+  const metaLine = type === "demo"
+    ? [
+        `Website: ${row.website_url || ""}`,
+        `Client: ${row.client_id || ""}`,
+        `Chatbot: ${row.chatbot_id || ""}`,
+        metadata.referrer ? `Referrer: ${metadata.referrer}` : "",
+        metadata.utm_source ? `UTM source: ${metadata.utm_source}` : "",
+        metadata.utm_campaign ? `Campaign: ${metadata.utm_campaign}` : "",
+        metadata.utm_term ? `Term: ${metadata.utm_term}` : ""
+      ].filter(Boolean).join(" | ")
+    : [
+        `Website: ${row.website_url || ""}`,
+        `Client: ${row.client_id || ""}`,
+        `Chatbot: ${row.chatbot_id || ""}`
+      ].join(" | ");
+
+  return `
+    <article class="border-t border-slate-100 px-4 py-4">
+      <div class="grid gap-3 lg:grid-cols-[1fr_auto] lg:items-start">
+        <div class="min-w-0">
+          <p class="text-sm font-bold text-slate-900">${escapeHtml(formatAdminValue(row.started_at))}</p>
+          <p class="mt-1 text-xs text-slate-500" title="${escapeAttr(row.visitor_id || "")}">Visitor ${escapeHtml(shortId(row.visitor_id))}</p>
+          <p class="mt-2 break-words text-sm text-slate-700">${escapeHtml(row.last_user_message || "No user message yet")}</p>
+          <p class="mt-2 break-words text-xs text-slate-500">${escapeHtml(metaLine)}</p>
+        </div>
+        <div class="text-xs text-slate-500 lg:text-right">
+          <p>${escapeHtml(row.message_count ?? 0)} message(s)</p>
+          <p>Last ${escapeHtml(formatAdminValue(row.last_message_at || row.started_at))}</p>
+        </div>
+      </div>
+      <details class="mt-3">
+        <summary class="inline-flex cursor-pointer rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-900">
+          View Conversation
+        </summary>
+        <div class="mt-3 grid gap-2">
+          ${transcript.map(function (message) {
+            const sender = String(message.sender || "").toLowerCase() === "bot" ? "Bot" : "Visitor";
+            const isBot = sender === "Bot";
+            return `
+              <div class="${isBot ? "bg-slate-50" : "bg-[#fff7ef]"} rounded-lg px-3 py-2">
+                <div class="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                  <span class="text-xs font-bold uppercase tracking-wide ${isBot ? "text-slate-500" : "text-[#8e4427]"}">${sender}</span>
+                  <span class="text-xs text-slate-400">${escapeHtml(formatAdminValue(message.created_at))}</span>
+                </div>
+                <p class="mt-1 whitespace-pre-wrap break-words text-sm leading-6 text-slate-800">${escapeHtml(message.message)}</p>
+              </div>
+            `;
+          }).join("")}
+        </div>
+      </details>
+    </article>
+  `;
+}
+
 function renderAdminTable(key, title, rows, columns) {
   const host = document.querySelector(`[data-admin-table="${key}"]`);
   if (!host) return;
@@ -1104,6 +1261,12 @@ function renderAdminTable(key, title, rows, columns) {
       </div>
     </section>
   `;
+}
+
+function shortId(value) {
+  const text = String(value || "");
+  if (!text) return "";
+  return text.length > 12 ? `${text.slice(0, 8)}...${text.slice(-4)}` : text;
 }
 
 function formatAdminValue(value) {

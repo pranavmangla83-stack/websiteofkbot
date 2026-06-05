@@ -12,26 +12,32 @@ const MAX_CHUNKS_PER_PAGE = 30;
 const FETCH_TIMEOUT_MS = 12_000;
 const USER_AGENT = "CustomAIChatbotBot/1.0 (+https://customaichatbot.online)";
 
-export async function discoverWebsitePages(startUrl) {
+export async function discoverWebsitePages(startUrl, options = {}) {
   const baseUrl = normalizePublicUrl(startUrl);
-  const robots = await getRobotsRules(baseUrl);
+  assertAllowedHostname(baseUrl, options.allowedHostname);
+  const robots = await getRobotsRules(baseUrl, options.fetchTimeoutMs);
   assertAllowedByRobots(baseUrl, robots);
 
-  const html = await fetchHtml(baseUrl);
+  const html = await fetchHtml(baseUrl, options.fetchTimeoutMs);
   const links = extractLinks(html, baseUrl);
+  const maxPages = options.maxPages || MAX_DISCOVERED_PAGES;
   const urls = uniqueUrls([baseUrl.href, ...links])
     .filter((url) => sameOrigin(url, baseUrl))
-    .slice(0, MAX_DISCOVERED_PAGES);
+    .filter((url) => allowedHostname(url, options.allowedHostname))
+    .slice(0, maxPages);
 
   return urls.map((url) => ({ url }));
 }
 
-export async function indexWebsitePages({ account, urls }) {
+export async function indexWebsitePages({ account, urls, options = {} }) {
   const baseUrl = normalizePublicUrl(urls[0]);
-  const robots = await getRobotsRules(baseUrl);
+  assertAllowedHostname(baseUrl, options.allowedHostname);
+  const robots = await getRobotsRules(baseUrl, options.fetchTimeoutMs);
+  const maxPages = options.maxPages || MAX_INDEX_PAGES;
   const normalizedUrls = uniqueUrls(urls.map((url) => normalizePublicUrl(url).href))
     .filter((url) => sameOrigin(url, baseUrl))
-    .slice(0, MAX_INDEX_PAGES);
+    .filter((url) => allowedHostname(url, options.allowedHostname))
+    .slice(0, maxPages);
 
   if (!normalizedUrls.length) {
     throw Object.assign(new Error("Add at least one public page from the allowed website."), { statusCode: 400 });
@@ -45,7 +51,8 @@ export async function indexWebsitePages({ account, urls }) {
       const pageUrl = normalizePublicUrl(url);
       assertAllowedByRobots(pageUrl, robots);
 
-      const html = await fetchHtml(pageUrl);
+      assertAllowedHostname(pageUrl, options.allowedHostname);
+      const html = await fetchHtml(pageUrl, options.fetchTimeoutMs);
       const page = extractPageText(html, pageUrl);
       const chunks = splitTextIntoChunks(page.text).slice(0, MAX_CHUNKS_PER_PAGE);
 
@@ -225,11 +232,11 @@ async function saveFailedWebsitePage({ account, url, errorMessage }) {
   });
 }
 
-async function fetchHtml(url) {
+async function fetchHtml(url, timeoutMs = FETCH_TIMEOUT_MS) {
   await assertPublicNetworkTarget(url);
 
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
     const response = await fetch(url.href, {
@@ -365,9 +372,9 @@ function extractLinks(html, baseUrl) {
   return links;
 }
 
-async function getRobotsRules(baseUrl) {
+async function getRobotsRules(baseUrl, timeoutMs = FETCH_TIMEOUT_MS) {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
     const robotsUrl = new URL("/robots.txt", baseUrl);
@@ -422,6 +429,22 @@ function assertAllowedByRobots(url, rules) {
 function sameOrigin(value, baseUrl) {
   try {
     return new URL(value).origin === baseUrl.origin;
+  } catch (_error) {
+    return false;
+  }
+}
+
+function assertAllowedHostname(url, hostname) {
+  if (!hostname) return;
+  if (!allowedHostname(url.href, hostname)) {
+    throw Object.assign(new Error("Only the configured demo website domain can be crawled."), { statusCode: 400 });
+  }
+}
+
+function allowedHostname(value, hostname) {
+  if (!hostname) return true;
+  try {
+    return new URL(value).hostname.toLowerCase() === String(hostname).toLowerCase();
   } catch (_error) {
     return false;
   }
