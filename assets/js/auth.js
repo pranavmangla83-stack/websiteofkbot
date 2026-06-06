@@ -849,13 +849,13 @@ async function apiFetch(path, options = {}) {
 }
 
 async function getBackendToken() {
-  const accessToken = await kindeClient.getToken();
-  if (isJwt(accessToken)) return accessToken;
-
   if (typeof kindeClient.getIdToken === "function") {
     const idToken = await kindeClient.getIdToken();
     if (isJwt(idToken)) return idToken;
   }
+
+  const accessToken = await kindeClient.getToken();
+  if (isJwt(accessToken)) return accessToken;
 
   return accessToken;
 }
