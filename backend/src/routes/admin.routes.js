@@ -283,20 +283,49 @@ adminRouter.post("/documents/:id/retry", async (req, res, next) => {
   }
 });
 
-export function requireAdmin(req, res, next) {
-  const email = String(req.auth?.email || "").toLowerCase();
+export async function requireAdmin(req, res, next) {
+  try {
+    const adminEmails = new Set(env.adminEmails);
+    const candidateEmails = new Set(
+      [req.auth?.email, ...(await getStoredAccountEmails(req.auth?.kindeUserId))]
+        .map((email) => String(email || "").trim().toLowerCase())
+        .filter(Boolean)
+    );
 
-  if (!env.adminEmails.length) {
-    return res.status(503).json({
-      error: "Admin access is not configured. Set ADMIN_EMAILS in the backend environment."
-    });
+    if (!adminEmails.size) {
+      return res.status(503).json({
+        error: "Admin access is not configured. Set ADMIN_EMAILS in the backend environment."
+      });
+    }
+
+    const isAllowed = [...candidateEmails].some((email) => adminEmails.has(email));
+    if (!isAllowed) {
+      return res.status(403).json({ error: "This account is not allowed to access admin operations." });
+    }
+
+    next();
+  } catch (error) {
+    next(error);
   }
+}
 
-  if (!email || !env.adminEmails.includes(email)) {
-    return res.status(403).json({ error: "This account is not allowed to access admin operations." });
-  }
+async function getStoredAccountEmails(kindeUserId) {
+  if (!kindeUserId) return [];
 
-  next();
+  const result = await query(
+    `
+      SELECT email
+      FROM clients
+      WHERE kinde_user_id = $1
+      UNION
+      SELECT email
+      FROM users
+      WHERE kinde_user_id = $1
+    `,
+    [kindeUserId]
+  );
+
+  return result.rows.map((row) => row.email);
 }
 
 function processingStatuses() {
