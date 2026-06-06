@@ -22,9 +22,28 @@ try {
   const seed = await fs.readFile(path.join(__dirname, "seed.sql"), "utf8");
 
   await pool.query(schema);
+  await runMigrations();
   await pool.query(seed);
 
-  console.log("Database schema migrated and Basic plan seeded.");
+  console.log("Database schema migrated and plans seeded.");
 } finally {
   await pool.end();
+}
+
+async function runMigrations() {
+  const migrationsDir = path.join(__dirname, "migrations");
+  let migrationFiles = [];
+
+  try {
+    migrationFiles = await fs.readdir(migrationsDir);
+  } catch (error) {
+    if (error.code === "ENOENT") return;
+    throw error;
+  }
+
+  for (const fileName of migrationFiles.filter((file) => file.endsWith(".sql")).sort()) {
+    const sql = await fs.readFile(path.join(migrationsDir, fileName), "utf8");
+    await pool.query(sql);
+    console.log(`Applied migration ${fileName}`);
+  }
 }
