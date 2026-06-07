@@ -1,8 +1,15 @@
 import crypto from "node:crypto";
 import express from "express";
+import multer from "multer";
 import { env } from "../config/env.js";
 import { query, withTransaction } from "../db/pool.js";
-import { DEMO_MESSAGE_LIMIT, crawlDemoWebsite, getDemoSessionChatbot } from "../services/demo-chatbot.js";
+import {
+  DEMO_MAX_PDF_BYTES,
+  DEMO_MESSAGE_LIMIT,
+  crawlDemoWebsite,
+  getDemoSessionChatbot,
+  indexDemoPdf
+} from "../services/demo-chatbot.js";
 import { assertCanUseChat } from "../services/entitlements.js";
 import { notifyLeadSubmitted } from "../services/email.js";
 import { createChatAnswer, createEmbedding } from "../services/openai.js";
@@ -23,6 +30,14 @@ const demoCrawlLimiter = createChatLimiter({
   windowMs: 60 * 1000,
   visitorLimit: 5,
   clientLimit: 20
+});
+
+const demoPdfUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: DEMO_MAX_PDF_BYTES,
+    files: 1
+  }
 });
 
 chatRouter.post("/", chatLimiter, async (req, res, next) => {
@@ -163,6 +178,44 @@ chatRouter.post("/demo/crawl", demoCrawlLimiter, async (req, res, next) => {
   }
 });
 
+chatRouter.post("/demo/pdf", demoCrawlLimiter, demoPdfUpload.single("pdf"), async (req, res, next) => {
+  try {
+    const sessionId = normalizeSessionId(req.body?.session_id || req.body?.visitor_id) || crypto.randomUUID();
+    const file = req.file;
+
+    if (!file) {
+      return res.status(400).json({ error: "PDF file is required. Use form field name 'pdf'." });
+    }
+
+    if (!isPdfUpload(file)) {
+      return res.status(400).json({ error: "Please choose a valid PDF file for this demo." });
+    }
+
+    const result = await indexDemoPdf({
+      visitorId: sessionId,
+      pdfBuffer: file.buffer,
+      fileName: normalizeText(file.originalname, 180) || "demo.pdf",
+      visitorMetadata: parseJsonMetadata(req.body?.visitor_metadata)
+    });
+
+    res.status(201).json({
+      uploaded: true,
+      session_id: sessionId,
+      chat_session_id: result.session.id,
+      file_name: result.file_name,
+      source_type: result.source_type,
+      page_count: result.page_count,
+      chunks_created: result.chunks_created,
+      chunks_limited: result.chunks_limited,
+      max_chunks: result.max_chunks,
+      message_limit: DEMO_MESSAGE_LIMIT,
+      expires_in_hours: 72
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 chatRouter.post("/demo", chatLimiter, async (req, res, next) => {
   try {
     const rawMessage = String(req.body?.message || "");
@@ -175,7 +228,7 @@ chatRouter.post("/demo", chatLimiter, async (req, res, next) => {
 
     const demoChatbot = await getDemoSessionChatbot(sessionId);
     if (!demoChatbot) {
-      return res.status(400).json({ error: "Submit a website URL before asking the demo chatbot." });
+      return res.status(400).json({ error: "Submit a website URL or upload a PDF before asking the demo chatbot." });
     }
 
     const session = await getOrCreateChatSession({
@@ -204,9 +257,7 @@ chatRouter.post("/demo", chatLimiter, async (req, res, next) => {
       embedding: messageEmbedding
     });
     const context = chunks.map((chunk, index) => {
-      const label = chunk.metadata?.url
-        ? `Website source ${index + 1} (${chunk.metadata.url})`
-        : `Website source ${index + 1}`;
+      const label = demoSourceLabel(chunk, index);
       return `${label}:\n${chunk.chunk_text}`;
     }).join("\n\n");
     const answerResult = context
@@ -514,6 +565,45 @@ function normalizeOptionalUrl(value) {
   } catch (_error) {
     return null;
   }
+}
+
+function parseJsonMetadata(value) {
+  if (!value) return {};
+  if (typeof value === "object") return value;
+
+  try {
+    const parsed = JSON.parse(String(value));
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch (_error) {
+    return {};
+  }
+}
+
+function isPdfUpload(file) {
+  const hasPdfExtension = String(file.originalname || "").toLowerCase().endsWith(".pdf");
+  const allowedMimeType = ["application/pdf", "application/octet-stream"].includes(String(file.mimetype || "").toLowerCase());
+  const hasPdfMagicBytes = file.buffer?.subarray(0, 5).toString("ascii") === "%PDF-";
+
+  return hasPdfExtension && allowedMimeType && hasPdfMagicBytes;
+}
+
+function demoSourceLabel(chunk, index) {
+  const sourceType = chunk.source_type || chunk.metadata?.source_type || "";
+
+  if (sourceType === "website" && chunk.metadata?.url) {
+    return `Website source ${index + 1} (${chunk.metadata.url})`;
+  }
+
+  if (sourceType === "website") {
+    return `Website source ${index + 1}`;
+  }
+
+  if (sourceType === "pdf_text" || sourceType === "ocr") {
+    const fileName = chunk.metadata?.file_name ? ` (${chunk.metadata.file_name})` : "";
+    return `PDF source ${index + 1}${fileName}`;
+  }
+
+  return `Source ${index + 1}`;
 }
 
 function isValidEmail(value) {

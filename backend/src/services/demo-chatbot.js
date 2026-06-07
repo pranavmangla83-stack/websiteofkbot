@@ -1,10 +1,14 @@
 import { query, withTransaction } from "../db/pool.js";
+import { createEmbedding } from "./openai.js";
+import { preparePdfForKnowledgeBase } from "./pdf-processing.js";
 import { discoverWebsitePages, indexWebsitePages, normalizePublicUrl } from "./website-processing.js";
 
 export const DEMO_CLIENT_KINDE_ID = "homepage-demo";
 export const DEMO_MESSAGE_LIMIT = 5;
 export const DEMO_DATA_TTL_HOURS = 72;
 export const DEMO_MAX_PAGES = 3;
+export const DEMO_MAX_PDF_BYTES = 10 * 1024 * 1024;
+export const DEMO_MAX_PDF_CHUNKS = 40;
 
 const DEMO_CRAWL_OPTIONS = {
   maxPages: DEMO_MAX_PAGES,
@@ -68,6 +72,125 @@ export async function crawlDemoWebsite({ visitorId, websiteUrl, visitorMetadata 
     failed_pages: result.failed.length,
     indexed: result.indexed,
     failed: result.failed
+  };
+}
+
+export async function indexDemoPdf({ visitorId, pdfBuffer, fileName, visitorMetadata }) {
+  await cleanupExpiredDemoData();
+
+  if (!Buffer.isBuffer(pdfBuffer) || pdfBuffer.length === 0) {
+    throw Object.assign(new Error("PDF file is required."), { statusCode: 400 });
+  }
+
+  if (pdfBuffer.length > DEMO_MAX_PDF_BYTES) {
+    throw Object.assign(new Error("In demo, you can upload one PDF of 10 MB only."), {
+      statusCode: 400,
+      publicMessage: "In demo, you can upload one PDF of 10 MB only."
+    });
+  }
+
+  const client = await ensureDemoClient();
+  const chatbot = await ensureSessionDemoChatbot({
+    clientId: client.id,
+    visitorId
+  });
+
+  const session = await getOrCreateDemoSession({
+    clientId: client.id,
+    chatbotId: chatbot.id,
+    visitorId,
+    visitorMetadata: {
+      ...(visitorMetadata || {}),
+      source: "demo_chat",
+      demo: true,
+      demo_pdf_file_name: fileName || "demo.pdf"
+    }
+  });
+
+  const processed = await preparePdfForKnowledgeBase({ pdfBuffer });
+  const limitedChunks = processed.chunks.slice(0, DEMO_MAX_PDF_CHUNKS);
+  const embeddedChunks = [];
+
+  for (let index = 0; index < limitedChunks.length; index += 1) {
+    const chunk = limitedChunks[index];
+    embeddedChunks.push({
+      index,
+      chunkText: chunk.chunkText,
+      embedding: await createEmbedding(chunk.chunkText),
+      tokenCount: Math.ceil(chunk.chunkText.length / 4),
+      pageNumber: chunk.pageNumber,
+      sourceType: chunk.sourceType,
+      ocrConfidence: chunk.ocrConfidence
+    });
+  }
+
+  await withTransaction(async (db) => {
+    await db.query(
+      `
+        DELETE FROM document_chunks
+        WHERE client_id = $1
+          AND chatbot_id = $2
+          AND source_type IN ('pdf_text', 'ocr')
+          AND metadata->>'demo_pdf' = 'true'
+      `,
+      [client.id, chatbot.id]
+    );
+
+    for (const chunk of embeddedChunks) {
+      await db.query(
+        `
+          INSERT INTO document_chunks (
+            document_id,
+            user_id,
+            client_id,
+            chatbot_id,
+            chunk_index,
+            chunk_text,
+            embedding,
+            token_count,
+            page_number,
+            source_type,
+            ocr_confidence,
+            metadata
+          )
+          VALUES (NULL, $1, $2, $3, $4, $5, $6::vector, $7, $8, $9, $10, $11)
+        `,
+        [
+          client.id,
+          client.id,
+          chatbot.id,
+          chunk.index,
+          chunk.chunkText,
+          vectorToSql(chunk.embedding),
+          chunk.tokenCount,
+          chunk.pageNumber,
+          chunk.sourceType,
+          chunk.ocrConfidence,
+          {
+            demo_pdf: true,
+            file_name: fileName || "demo.pdf",
+            chunk_index: chunk.index,
+            total_chunks: embeddedChunks.length,
+            total_extracted_chunks: processed.chunks.length,
+            page_number: chunk.pageNumber,
+            source_type: chunk.sourceType,
+            ocr_confidence: chunk.ocrConfidence
+          }
+        ]
+      );
+    }
+  });
+
+  return {
+    client,
+    chatbot,
+    session,
+    file_name: fileName || "demo.pdf",
+    source_type: processed.sourceType,
+    page_count: processed.pageCount || null,
+    chunks_created: embeddedChunks.length,
+    chunks_limited: processed.chunks.length > embeddedChunks.length,
+    max_chunks: DEMO_MAX_PDF_CHUNKS
   };
 }
 
@@ -151,15 +274,17 @@ async function ensureSessionDemoChatbot({ clientId, visitorId, websiteUrl }) {
       const updated = (await db.query(
         `
           UPDATE chatbots
-          SET website_url = $1, updated_at = now()
+          SET website_url = COALESCE($1, website_url), updated_at = now()
           WHERE id = $2
           RETURNING *
         `,
-        [websiteUrl, existing.id]
+        [websiteUrl || null, existing.id]
       )).rows[0];
 
-      await db.query("DELETE FROM document_chunks WHERE client_id = $1 AND chatbot_id = $2", [clientId, existing.id]);
-      await db.query("DELETE FROM website_pages WHERE client_id = $1 AND chatbot_id = $2", [clientId, existing.id]);
+      if (websiteUrl) {
+        await db.query("DELETE FROM document_chunks WHERE client_id = $1 AND chatbot_id = $2 AND source_type = 'website'", [clientId, existing.id]);
+        await db.query("DELETE FROM website_pages WHERE client_id = $1 AND chatbot_id = $2", [clientId, existing.id]);
+      }
 
       return updated;
     }
@@ -173,6 +298,10 @@ async function ensureSessionDemoChatbot({ clientId, visitorId, websiteUrl }) {
       [clientId, "Homepage Demo Chatbot", websiteUrl]
     )).rows[0];
   });
+}
+
+function vectorToSql(embedding) {
+  return `[${embedding.join(",")}]`;
 }
 
 async function getOrCreateDemoSession({ clientId, chatbotId, visitorId, visitorMetadata }) {
